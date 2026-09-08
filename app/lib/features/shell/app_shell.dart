@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/drift_user_profile_repository.dart';
+import '../../providers.dart';
 import '../../theme/spacing_tokens.dart';
 import '../../widgets/glass/glass_tab_bar.dart';
 import '../conversations/conversation_list_page.dart';
 import '../home/home_page.dart';
 import '../me/me_info_page.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, this.initialTab = 0});
 
   final int initialTab;
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
   late int _index;
+  DateTime _lastRefreshDay = DateTime.now();
 
   static const _tabs = [
     GlassTabItem(
@@ -40,6 +45,35 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _index = widget.initialTab;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshStageIfNeeded();
+    }
+  }
+
+  Future<void> _refreshStageIfNeeded() async {
+    final now = DateTime.now();
+    final dayChanged = now.year != _lastRefreshDay.year ||
+        now.month != _lastRefreshDay.month ||
+        now.day != _lastRefreshDay.day;
+    _lastRefreshDay = now;
+    final repo = ref.read(userProfileRepositoryProvider);
+    if (repo is DriftUserProfileRepository) {
+      await repo.refresh(now);
+    }
+    if (dayChanged || repo is DriftUserProfileRepository) {
+      ref.invalidate(userProfileSnapshotProvider);
+    }
   }
 
   @override

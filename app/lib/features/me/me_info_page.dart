@@ -10,6 +10,7 @@ import '../../theme/spacing_tokens.dart';
 import '../../widgets/atmosphere_background.dart';
 import '../../widgets/glass/glass_container.dart';
 import '../../widgets/glass/glass_tab_bar.dart';
+import 'me_profile_form.dart';
 import 'privacy_sheet.dart';
 
 class MeInfoPage extends ConsumerWidget {
@@ -36,6 +37,22 @@ class MeInfoPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
             child: Column(
               children: [
+                _MeTile(
+                  tileKey: const Key('me_edit_profile'),
+                  icon: Icons.edit_outlined,
+                  title: AppCopy.editProfile,
+                  onTap: () async {
+                    final saved = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute<bool>(
+                        builder: (_) => const MeProfileFormPage(),
+                      ),
+                    );
+                    if (saved == true) {
+                      ref.invalidate(userProfileSnapshotProvider);
+                    }
+                  },
+                ),
+                const Divider(indent: 56),
                 _MeTile(
                   tileKey: const Key('me_privacy'),
                   icon: Icons.privacy_tip_outlined,

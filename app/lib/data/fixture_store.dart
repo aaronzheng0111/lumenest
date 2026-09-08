@@ -21,12 +21,12 @@ Future<PrivacyNotice> loadPrivacyNotice() async {
   }
 }
 
-/// Reads `assets/fixtures/mock-user.json` until 03 ships a real store.
+/// Reads `assets/fixtures/mock-user.json` for cold-start demos without Drift edits.
 class AssetMockUserProfileRepository implements UserProfileRepository {
   int getSnapshotCalls = 0;
 
   @override
-  Future<UserProfileSnapshot> getSnapshot() async {
+  Future<UserProfileSnapshot> getSnapshot({DateTime? today}) async {
     getSnapshotCalls++;
     try {
       final raw = await rootBundle.loadString(mockUserAssetPath);
@@ -39,5 +39,15 @@ class AssetMockUserProfileRepository implements UserProfileRepository {
     } catch (_) {
       return UserProfileSnapshot.fallback;
     }
+  }
+
+  @override
+  Future<ProfileDraft> loadDraft() async {
+    return const ProfileDraft(nickname: '妈妈');
+  }
+
+  @override
+  Future<void> saveEdits(ProfileEdits edits, {DateTime? today}) async {
+    // Mock asset store is read-only in P0 demos.
   }
 }

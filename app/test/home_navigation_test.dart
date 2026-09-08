@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_mom_baby/app.dart';
 import 'package:ai_mom_baby/app_copy.dart';
 import 'package:ai_mom_baby/data/fake_user_profile_repository.dart';
+import 'package:ai_mom_baby/data/fixture_store.dart';
 import 'package:ai_mom_baby/data/privacy_store.dart';
 import 'package:ai_mom_baby/data/user_profile_repository.dart';
 import 'package:ai_mom_baby/domain/stage.dart';
@@ -250,6 +251,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          userProfileRepositoryProvider.overrideWithValue(
+            AssetMockUserProfileRepository(),
+          ),
           privacyStoreProvider.overrideWithValue(MemoryPrivacyStore()),
           dataExporterProvider.overrideWithValue((_) async {}),
         ],

@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/db/database_provider.dart';
-import 'data/fixture_store.dart';
+import 'data/drift_user_profile_repository.dart';
 import 'data/privacy_store.dart';
 import 'data/user_profile_repository.dart';
 import 'domain/user_profile_snapshot.dart';
@@ -18,9 +18,9 @@ final databaseReadyProvider = FutureProvider<void>((ref) async {
   await ref.watch(databaseProvider).init();
 });
 
-final userProfileRepositoryProvider = Provider<UserProfileRepository>(
-  (ref) => AssetMockUserProfileRepository(),
-);
+final userProfileRepositoryProvider = Provider<UserProfileRepository>((ref) {
+  return DriftUserProfileRepository(ref.watch(databaseProvider));
+});
 
 /// Cold-start snapshot. Failures map to PREP without crashing.
 final userProfileSnapshotProvider =

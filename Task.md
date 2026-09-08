@@ -11,7 +11,7 @@
 
 ```
 [Phase 0: 准备与基础设施] ──────> [Phase 1: P0 单角色可运行 Demo] ──────> [Phase 2: P1 四角色会诊与记忆] ──────> [Phase 3: P2 商业化与高阶能力]
-        (进度: 100%)                     (进度: ~20%)                           (进度: 0%)                           (进度: 0%)
+        (进度: 100%)                     (进度: ~30%)                           (进度: 0%)                           (进度: 0%)
 ```
 
 - **P0 紧急核心**：完成 Flutter 骨架、设计系统 Token 落地、本地存储、安全红旗拦截、小暖单角色出网对话。
@@ -62,8 +62,9 @@
   - [x] Drift `AppDatabase`：users / conversations / messages / profile_events / task_cards / subscriptions + schema_meta
   - [x] 启动 ensure 单行 user id=1 与 FREE 订阅；v1→v2 空迁移骨架；L3/L4 字段标记
   - [x] AgentRole 等枚举 wire 值与 `assets/fixtures/enums.json` 对齐
-- [ ] **TASK-104** [P0] 孕周与阶段推导服务 (`sdd/03-user-profile-and-stage`)
-  - [ ] 基于预产期自动计算孕周（如「孕16周+3天」）与关键发育提示
+- [x] **TASK-104** [P0] 孕周与阶段推导服务 (`sdd/03-user-profile-and-stage`)
+  - [x] `resolveStage` / week 计算器与 `stage_cases.json` 对齐；Drift 档案读写
+  - [x] 「编辑档案」表单 + 分娩日期校验；AppLifecycle 触发 refresh
 
 ### 1.3 安全拦截与模型网关 (P0)
 - [ ] **TASK-105** [P0] 本地安全防御前置节点 (Guardrail) (`sdd/05-safety-guardrail`)

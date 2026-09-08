@@ -16,4 +16,12 @@ abstract final class AppCopy {
   static const emptyExportJson =
       '{"user":{},"conversations":[],"messages":[],"profile_events":[],"task_cards":[]}';
   static const localDataNeedsUpgrade = '本地数据需要升级，请更新应用';
+  static const editProfile = '编辑档案';
+  static const profileSaved = '已保存';
+  static const checkBirthDate = '请检查分娩日期';
+  static const nicknameLabel = '昵称';
+  static const lastMenstruationLabel = '末次月经';
+  static const dueDateLabel = '预产期';
+  static const birthDateLabel = '分娩日期';
+  static const saveProfile = '保存';
 }
