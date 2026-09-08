@@ -59,66 +59,73 @@ class _GlassTokenPreviewPageState extends State<GlassTokenPreviewPage> {
         title: const Text('孕育小家'),
       ),
       body: AtmosphereBackground(
-        child: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              SpacingTokens.pageMargin,
-              SpacingTokens.lg,
-              SpacingTokens.pageMargin,
-              SpacingTokens.xxl + GlassTabBar.height + SpacingTokens.xl,
-            ),
-            children: [
-              GlassContainer(
-                fill: GlassFill.medium,
-                borderRadius: RadiusTokens.borderXl,
-                padding: const EdgeInsets.all(SpacingTokens.xl),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: Builder(
+          builder: (context) {
+            // Scaffold extendBody* inflates this padding to the app bar / tab bar
+            // footprints so scroll extent clears chrome, while the list still
+            // paints under the glass.
+            final chrome = MediaQuery.paddingOf(context);
+            return ListView(
+              padding: EdgeInsets.fromLTRB(
+                SpacingTokens.pageMargin,
+                chrome.top + SpacingTokens.lg,
+                SpacingTokens.pageMargin,
+                chrome.bottom + SpacingTokens.lg,
+              ),
+              children: [
+                GlassContainer(
+                  fill: GlassFill.medium,
+                  borderRadius: RadiusTokens.borderXl,
+                  padding: const EdgeInsets.all(SpacingTokens.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('孕16周', style: textTheme.displaySmall),
+                      const SizedBox(height: SpacingTokens.sm),
+                      Text(
+                        'Liquid Glass Token 预览 · TASK-005',
+                        style: textTheme.bodySmall?.copyWith(color: onVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.sectionGap),
+                Row(
                   children: [
-                    Text('孕16周', style: textTheme.displaySmall),
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(
-                      'Liquid Glass Token 预览 · TASK-005',
-                      style: textTheme.bodySmall?.copyWith(color: onVariant),
+                    Expanded(
+                      child: GlassContainer(
+                        fill: GlassFill.rose,
+                        padding: const EdgeInsets.all(SpacingTokens.lg),
+                        child: Text('小暖 · 激活', style: textTheme.labelMedium),
+                      ),
+                    ),
+                    const SizedBox(width: SpacingTokens.md),
+                    Expanded(
+                      child: GlassContainer(
+                        fill: GlassFill.locked,
+                        padding: const EdgeInsets.all(SpacingTokens.lg),
+                        child: Text(
+                          '林医生 · 锁定',
+                          style: textTheme.labelMedium?.copyWith(
+                            color: onVariant,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.sectionGap),
-              Row(
-                children: [
-                  Expanded(
-                    child: GlassContainer(
-                      fill: GlassFill.rose,
-                      padding: const EdgeInsets.all(SpacingTokens.lg),
-                      child: Text('小暖 · 激活', style: textTheme.labelMedium),
-                    ),
+                const SizedBox(height: SpacingTokens.sectionGap),
+                GlassContainer(
+                  fill: GlassFill.light,
+                  padding: const EdgeInsets.all(SpacingTokens.lg),
+                  child: Text(
+                    '默认玻璃卡片：半透明 + BackdropFilter 模糊 + 高光描边。',
+                    style: textTheme.bodyMedium,
                   ),
-                  const SizedBox(width: SpacingTokens.md),
-                  Expanded(
-                    child: GlassContainer(
-                      fill: GlassFill.locked,
-                      padding: const EdgeInsets.all(SpacingTokens.lg),
-                      child: Text(
-                        '林医生 · 锁定',
-                        style: textTheme.labelMedium?.copyWith(color: onVariant),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: SpacingTokens.sectionGap),
-              GlassContainer(
-                fill: GlassFill.light,
-                padding: const EdgeInsets.all(SpacingTokens.lg),
-                child: Text(
-                  '默认玻璃卡片：半透明 + BackdropFilter 模糊 + 高光描边。',
-                  style: textTheme.bodyMedium,
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
       bottomNavigationBar: GlassTabBar(

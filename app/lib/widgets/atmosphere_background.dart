@@ -35,7 +35,7 @@ class AtmosphereBackground extends StatelessWidget {
             color: AppColors.primary.withOpacity(0.25),
           ),
         ),
-        if (child != null) child!,
+        if (child != null) Positioned.fill(child: child!),
       ],
     );
   }
