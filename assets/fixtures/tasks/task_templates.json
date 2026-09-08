@@ -1,0 +1,7 @@
+{
+  "templates": [
+    {"id": "prep-water", "stage": "PREP", "weekMin": null, "weekMax": null, "title": "喝水打卡", "body": "今天喝够8杯水（习惯，非医嘱）"},
+    {"id": "preg-walk", "stage": "PREGNANT", "weekMin": 12, "weekMax": 32, "title": "散步15分钟", "body": "身体允许再进行，不舒服就停下"},
+    {"id": "post-rest", "stage": "POSTPARTUM", "weekMin": 1, "weekMax": 6, "title": "午休30分钟", "body": "能躺则躺，寻求家人分担"}
+  ]
+}

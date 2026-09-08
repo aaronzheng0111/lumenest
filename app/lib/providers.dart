@@ -20,6 +20,8 @@ import 'llm/dio_llm_client.dart';
 import 'llm/llm_types.dart';
 import 'safety/safety_audit_log.dart';
 import 'safety/safety_gate.dart';
+import 'tasks/drift_task_card_service.dart';
+import 'tasks/task_cards.dart';
 
 final databaseProvider = Provider<DatabaseProvider>((ref) {
   final provider = DriftDatabaseProvider();
@@ -164,4 +166,24 @@ final groupConsultGraphProvider = FutureProvider<GroupConsultGraph>((ref) async 
     summaryWriter: ref.watch(summaryWriterProvider),
     routerRules: rules,
   );
+});
+
+final taskCardServiceProvider = FutureProvider<TaskCardService>((ref) async {
+  final templates = await loadTaskTemplates();
+  return DriftTaskCardService(
+    databaseProvider: ref.watch(databaseProvider),
+    profiles: ref.watch(userProfileRepositoryProvider),
+    templates: templates,
+  );
+});
+
+final todayTaskCardsProvider =
+    FutureProvider<List<TaskCardView>>((ref) async {
+  try {
+    await ref.watch(databaseReadyProvider.future);
+    final service = await ref.watch(taskCardServiceProvider.future);
+    return service.listToday(DateTime.now());
+  } catch (_) {
+    return const [];
+  }
 });

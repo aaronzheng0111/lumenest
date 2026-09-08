@@ -16,6 +16,7 @@ void main() {
           ),
           privacyStoreProvider.overrideWithValue(MemoryPrivacyStore()),
           dataExporterProvider.overrideWithValue((_) async {}),
+          todayTaskCardsProvider.overrideWith((ref) async => const []),
         ],
         child: const AiMomBabyApp(showLaunchNotice: false),
       ),

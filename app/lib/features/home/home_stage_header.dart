@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../app_copy.dart';
 import '../../domain/user_profile_snapshot.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/glass_tokens.dart';
@@ -70,32 +69,6 @@ class HomeStageHeader extends StatelessWidget {
                 height: 88,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class TodayTaskTeaser extends StatelessWidget {
-  const TodayTaskTeaser({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassContainer(
-      fill: GlassFill.roseSoft,
-      padding: const EdgeInsets.all(SpacingTokens.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('今日任务', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.sm),
-          Text(
-            AppCopy.todayTasksPlaceholder,
-            key: const Key('today_tasks'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                ),
           ),
         ],
       ),

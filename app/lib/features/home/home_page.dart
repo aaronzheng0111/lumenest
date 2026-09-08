@@ -9,6 +9,7 @@ import '../../widgets/atmosphere_background.dart';
 import '../../widgets/glass/glass_tab_bar.dart';
 import 'home_stage_header.dart';
 import 'role_entry_grid.dart';
+import 'today_task_teaser.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});

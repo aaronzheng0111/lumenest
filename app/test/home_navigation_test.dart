@@ -11,6 +11,7 @@ import 'package:ai_mom_baby/data/user_profile_repository.dart';
 import 'package:ai_mom_baby/domain/stage.dart';
 import 'package:ai_mom_baby/domain/user_profile_snapshot.dart';
 import 'package:ai_mom_baby/providers.dart';
+import 'package:ai_mom_baby/tasks/task_cards.dart';
 
 class _RouteRecorder extends NavigatorObserver {
   final names = <String?>[];
@@ -27,6 +28,7 @@ Future<void> _pumpApp(
   PrivacyStore? privacy,
   List<NavigatorObserver> observers = const [],
   List<String> exported = const [],
+  List<Override> extraOverrides = const [],
 }) async {
   final fake = repo ?? FakeUserProfileRepository();
   final captured = List<String>.from(exported);
@@ -40,6 +42,8 @@ Future<void> _pumpApp(
         dataExporterProvider.overrideWithValue((json) async {
           captured.add(json);
         }),
+        todayTaskCardsProvider.overrideWith((ref) async => const []),
+        ...extraOverrides,
       ],
       child: AiMomBabyApp(
         navigatorObservers: observers,
@@ -60,7 +64,7 @@ void main() {
     expect(find.text('林医生'), findsOneWidget);
     expect(find.text('苏心'), findsOneWidget);
     expect(find.text('阿嬷'), findsOneWidget);
-    expect(find.text(AppCopy.todayTasksPlaceholder), findsOneWidget);
+    expect(find.text(AppCopy.noTasksToday), findsOneWidget);
   });
 
   testWidgets('AC-01-F01 pregnant week copy', (tester) async {
@@ -145,6 +149,7 @@ void main() {
           dataExporterProvider.overrideWithValue((json) async {
             exported.add(json);
           }),
+          todayTaskCardsProvider.overrideWith((ref) async => const []),
         ],
         child: const AiMomBabyApp(showLaunchNotice: false),
       ),
@@ -221,6 +226,7 @@ void main() {
           dataExporterProvider.overrideWithValue((json) async {
             exported.add(json);
           }),
+          todayTaskCardsProvider.overrideWith((ref) async => const []),
         ],
         child: const AiMomBabyApp(showLaunchNotice: false),
       ),
@@ -258,6 +264,7 @@ void main() {
           ),
           privacyStoreProvider.overrideWithValue(MemoryPrivacyStore()),
           dataExporterProvider.overrideWithValue((_) async {}),
+          todayTaskCardsProvider.overrideWith((ref) async => const []),
         ],
         child: const AiMomBabyApp(),
       ),
@@ -287,6 +294,7 @@ void main() {
             ),
           ),
           dataExporterProvider.overrideWithValue((_) async {}),
+          todayTaskCardsProvider.overrideWith((ref) async => const []),
         ],
         child: const AiMomBabyApp(),
       ),
@@ -329,6 +337,7 @@ void main() {
           ),
           privacyStoreProvider.overrideWithValue(MemoryPrivacyStore()),
           groupConsultEnabledProvider.overrideWithValue(false),
+          todayTaskCardsProvider.overrideWith((ref) async => const []),
         ],
         child: const AiMomBabyApp(showLaunchNotice: false),
       ),

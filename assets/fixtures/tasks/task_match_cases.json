@@ -1,0 +1,8 @@
+{
+  "cases": [
+    {"stage": "PREP", "weekValue": null, "expectIds": ["prep-water"]},
+    {"stage": "PREGNANT", "weekValue": 16, "expectIds": ["preg-walk"]},
+    {"stage": "PREGNANT", "weekValue": 8, "expectIds": []},
+    {"stage": "POSTPARTUM", "weekValue": 3, "expectIds": ["post-rest"]}
+  ]
+}
