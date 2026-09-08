@@ -7,6 +7,7 @@ import '../domain/agent_role.dart';
 import '../knowledge/knowledge_retriever.dart';
 import '../llm/llm_types.dart';
 import '../safety/safety_gate.dart';
+import 'tool_acl.dart';
 
 class GraphTurnResult {
   const GraphTurnResult({
@@ -79,7 +80,7 @@ class XiaonuanGraph {
       );
     }
 
-    final hits = await retriever.search(userText, k: 3);
+    final hits = await _retrieveForRole(userText);
     final sources = hits.map((h) => h.title).take(3).toList();
     final slice = await slicer.build(
       userId: userId,
@@ -135,6 +136,17 @@ class XiaonuanGraph {
       sourceTitles: sources,
       assistantMessageId: id,
     );
+  }
+
+  Future<List<KnowledgeHit>> _retrieveForRole(String userText) async {
+    if (!ToolAcl.canUse(speaker, AgentTool.retrieveKb)) {
+      return const [];
+    }
+    final hits = await retriever.search(userText, k: 3);
+    if (speaker == AgentRole.suxin) {
+      return hits.where((h) => ToolAcl.suxinMayUseChunk(h.id)).toList();
+    }
+    return hits;
   }
 
   static String _requestId() {

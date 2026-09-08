@@ -87,16 +87,18 @@ void main() {
     expect(find.byKey(const Key('locked_banner')), findsNothing);
   });
 
-  testWidgets('AC-01-F02 locked role shows banner and does not crash',
+  testWidgets('AC-01-F02 / AC-11-F01 unlocked role opens chat without banner',
       (tester) async {
     final observer = _RouteRecorder();
     await _pumpApp(tester, observers: [observer]);
     await tester.tap(find.byKey(const Key('role_LIN')));
     await tester.pumpAndSettle();
     expect(observer.names.last, '/chat?role=LIN');
-    expect(find.text(AppCopy.roleLockedBanner), findsOneWidget);
-    expect(tester.widget<IconButton>(find.byKey(const Key('chat_send'))).onPressed,
-        isNull);
+    expect(find.byKey(const Key('locked_banner')), findsNothing);
+    expect(
+      tester.widget<IconButton>(find.byKey(const Key('chat_send'))).onPressed,
+      isNotNull,
+    );
   });
 
   testWidgets('AC-01-F03 exactly three tabs and empty conversation copy',

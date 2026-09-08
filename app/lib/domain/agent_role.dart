@@ -22,7 +22,11 @@ extension AgentRoleX on AgentRole {
         AgentRole.ama => '阿嬷',
       };
 
-  bool get unlockedInP1 => this == AgentRole.xiaonuan;
+  /// All four roles unlocked from Phase 2 (TASK-203).
+  bool get isUnlocked => true;
+
+  @Deprecated('Use isUnlocked')
+  bool get unlockedInP1 => isUnlocked;
 
   String get avatarAsset => switch (this) {
         AgentRole.xiaonuan => 'assets/avatars/xiaonuan.png',

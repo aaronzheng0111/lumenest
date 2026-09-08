@@ -34,7 +34,7 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
   bool _awaitingReply = false;
   DateTime? _lastSendAt;
 
-  bool get _locked => !widget.role.unlockedInP1;
+  bool get _locked => !widget.role.isUnlocked;
 
   @override
   void initState() {
@@ -149,7 +149,7 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
         _scrollToEnd();
       }
 
-      final graph = await ref.read(xiaonuanGraphProvider.future);
+      final graph = await ref.read(agentGraphProvider(widget.role).future);
       await graph.handle(conversationId: conversationId, userText: text);
       final afterAssistant = await repo.listMessages(conversationId);
       if (mounted) {

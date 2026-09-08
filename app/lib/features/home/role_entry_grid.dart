@@ -47,7 +47,7 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final unlocked = role.unlockedInP1;
+    final unlocked = role.isUnlocked;
     return Semantics(
       button: true,
       label: role.displayName,

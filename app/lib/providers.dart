@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'agent/xiaonuan_graph.dart';
+import 'agent/role_prompts.dart';
 import 'context/context_slice.dart';
 import 'context/drift_context_slice.dart';
 import 'data/conversation_repository.dart';
@@ -10,6 +11,7 @@ import 'data/drift_conversation_repository.dart';
 import 'data/drift_user_profile_repository.dart';
 import 'data/privacy_store.dart';
 import 'data/user_profile_repository.dart';
+import 'domain/agent_role.dart';
 import 'domain/user_profile_snapshot.dart';
 import 'knowledge/knowledge_retriever.dart';
 import 'llm/dio_llm_client.dart';
@@ -123,9 +125,15 @@ final summaryWriterProvider = Provider<SummaryWriter>((ref) {
 });
 
 final xiaonuanGraphProvider = FutureProvider<XiaonuanGraph>((ref) async {
+  return ref.watch(agentGraphProvider(AgentRole.xiaonuan).future);
+});
+
+/// Solo-role graph (TASK-203). GROUP handoff uses [groupConsultGraphProvider].
+final agentGraphProvider =
+    FutureProvider.family<XiaonuanGraph, AgentRole>((ref, role) async {
   final safety = await ref.watch(safetyGateProvider.future);
   final retriever = await ref.watch(knowledgeRetrieverProvider.future);
-  final prompt = await XiaonuanGraph.loadSystemPrompt();
+  final prompt = await RolePrompts.load(role);
   return XiaonuanGraph(
     safety: safety,
     retriever: retriever,
@@ -134,5 +142,6 @@ final xiaonuanGraphProvider = FutureProvider<XiaonuanGraph>((ref) async {
     systemPrompt: prompt,
     slicer: ref.watch(contextSlicerProvider),
     summaryWriter: ref.watch(summaryWriterProvider),
+    speaker: role,
   );
 });
