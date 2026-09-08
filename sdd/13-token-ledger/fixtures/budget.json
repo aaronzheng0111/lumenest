@@ -1,0 +1,6 @@
+{
+  "dailyTokenWarn": 200000,
+  "dailyTokenHard": 500000,
+  "pricePerMTokenInputYuan": 8,
+  "pricePerMTokenOutputYuan": 8
+}
