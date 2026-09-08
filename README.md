@@ -80,6 +80,13 @@ flutter build apk --flavor dev --debug --dart-define-from-file=env/dev.json
 - 禁止在 `lib/` / `assets/` 硬编码供应商 key。
 - 开发机用 `--dart-define-from-file=env/dev.json`；生产须迁到系统密钥库或自有代理（见 `sdd/00-dev-environment` / `06-llm-api-client`）。
 
+## 模拟用户与启动隐私文案
+
+测试夹具：[`assets/fixtures/模拟用户与隐私文案.md`](assets/fixtures/模拟用户与隐私文案.md)
+
+- `mock-user.json`：冷启动首页用的模拟档案（当前孕 16 周）
+- `privacy-notice.json`：**每次启动**弹出的隐私状况页（改 JSON 即可改文案）
+
 ## 文档入口
 
 - 产品与分期：[`sdd/INDEX.md`](sdd/INDEX.md)

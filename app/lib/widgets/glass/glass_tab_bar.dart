@@ -11,10 +11,12 @@ class GlassTabItem {
   const GlassTabItem({
     required this.label,
     required this.icon,
+    this.tabKey,
   });
 
   final String label;
   final IconData icon;
+  final Key? tabKey;
 }
 
 /// Floating pill tab bar — selected tab uses rose glass, not a thick underline.
@@ -58,6 +60,7 @@ class GlassTabBar extends StatelessWidget {
             for (var i = 0; i < items.length; i++)
               Expanded(
                 child: _TabChip(
+                  key: items[i].tabKey,
                   item: items[i],
                   selected: i == currentIndex,
                   onTap: () => onChanged(i),
@@ -72,6 +75,7 @@ class GlassTabBar extends StatelessWidget {
 
 class _TabChip extends StatelessWidget {
   const _TabChip({
+    super.key,
     required this.item,
     required this.selected,
     required this.onTap,

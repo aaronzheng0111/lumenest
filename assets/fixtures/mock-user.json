@@ -1,0 +1,11 @@
+{
+  "id": "mock-user-linlin",
+  "displayName": "林林",
+  "stage": "PREGNANT",
+  "weekValue": 16,
+  "weekUnit": "PREGNANCY_WEEK",
+  "lmp": "2026-03-15",
+  "dueDate": "2026-12-20",
+  "city": "深圳",
+  "notes": "P1 模拟用户，仅用于本地预览与验收，不是真实档案。"
+}
