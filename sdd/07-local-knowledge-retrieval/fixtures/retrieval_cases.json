@@ -1,0 +1,7 @@
+{
+  "cases": [
+    {"query": "孕吐吃什么", "expectTopId": "kb-nausea-01"},
+    {"query": "睡不着侧卧", "expectTopId": "kb-sleep-01"},
+    {"query": "量子力学", "expectTopId": null}
+  ]
+}
