@@ -6,6 +6,8 @@ import 'data/drift_user_profile_repository.dart';
 import 'data/privacy_store.dart';
 import 'data/user_profile_repository.dart';
 import 'domain/user_profile_snapshot.dart';
+import 'safety/safety_audit_log.dart';
+import 'safety/safety_gate.dart';
 
 final databaseProvider = Provider<DatabaseProvider>((ref) {
   final provider = DriftDatabaseProvider();
@@ -46,4 +48,27 @@ typedef DataExporter = Future<void> Function(String json);
 
 final dataExporterProvider = Provider<DataExporter>((ref) {
   return (_) async {};
+});
+
+final safetyAuditLogProvider = Provider<SafetyAuditLog>((ref) {
+  return SafetyAuditLog();
+});
+
+/// Loaded once after first use. Tests may override with sync fixtures.
+final safetyGateProvider = FutureProvider<SafetyGate>((ref) async {
+  final audit = ref.watch(safetyAuditLogProvider);
+  return LocalSafetyGate.load(
+    onAudit: ({
+      required String category,
+      required String patternId,
+      String? conversationId,
+    }) {
+      // Fire-and-forget; never include message body.
+      audit.write(
+        category: category,
+        patternId: patternId,
+        conversationId: conversationId,
+      );
+    },
+  );
 });

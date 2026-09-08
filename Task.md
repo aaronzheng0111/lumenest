@@ -11,7 +11,7 @@
 
 ```
 [Phase 0: 准备与基础设施] ──────> [Phase 1: P0 单角色可运行 Demo] ──────> [Phase 2: P1 四角色会诊与记忆] ──────> [Phase 3: P2 商业化与高阶能力]
-        (进度: 100%)                     (进度: ~30%)                           (进度: 0%)                           (进度: 0%)
+        (进度: 100%)                     (进度: ~40%)                           (进度: 0%)                           (进度: 0%)
 ```
 
 - **P0 紧急核心**：完成 Flutter 骨架、设计系统 Token 落地、本地存储、安全红旗拦截、小暖单角色出网对话。
@@ -67,9 +67,9 @@
   - [x] 「编辑档案」表单 + 分娩日期校验；AppLifecycle 触发 refresh
 
 ### 1.3 安全拦截与模型网关 (P0)
-- [ ] **TASK-105** [P0] 本地安全防御前置节点 (Guardrail) (`sdd/05-safety-guardrail`)
-  - [ ] 规则引擎：识别孕期危急症状（大出血、剧烈腹痛、严重宫缩、胎动异常等）
-  - [ ] 触发红旗时**立即阻断 LLM 路由**，返回固定就医指引与应急文案
+- [x] **TASK-105** [P0] 本地安全防御前置节点 (Guardrail) (`sdd/05-safety-guardrail`)
+  - [x] `LocalSafetyGate` + patterns/replies/eval fixtures；拦截审计日志（不含原文）
+  - [x] Chat 接入与「安全提示」徽章留给 TASK-107/108
 - [ ] **TASK-106** [P0] 出网 LLM API Client 实现 (`sdd/06-llm-api-client`)
   - [ ] 支持 OpenAI 兼容格式 / SSE 流式响应 (Server-Sent Events)
   - [ ] API Key 安全存储（`--dart-define` 或本地安全加密存储，禁止硬编码进 APK）
