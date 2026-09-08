@@ -175,6 +175,76 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('AC-16-F01 chat send blocked until privacy accepted',
+      (tester) async {
+    await _pumpApp(tester);
+    await tester.tap(find.byKey(const Key('role_XIAONUAN')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat_send')));
+    await tester.pump();
+    expect(find.text(AppCopy.privacyRequiredToChat), findsOneWidget);
+  });
+
+  testWidgets('AC-16-F01 me privacy sheet agree persists', (tester) async {
+    final privacy = MemoryPrivacyStore();
+    await _pumpApp(tester, privacy: privacy);
+    await tester.tap(find.byKey(const Key('nav_me')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('me_privacy')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('privacy_sheet_title')), findsOneWidget);
+    expect(find.text(AppCopy.privacyTitle), findsWidgets);
+    await tester.tap(find.byKey(const Key('privacy_sheet_agree')));
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      if (find.byKey(const Key('privacy_sheet_title')).evaluate().isEmpty) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(find.byKey(const Key('privacy_sheet_title')), findsNothing);
+    expect(await privacy.isAccepted(), isTrue);
+  });
+
+  testWidgets('AC-16-F02 export JSON has no secrets', (tester) async {
+    final exported = <String>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileRepositoryProvider.overrideWithValue(
+            FakeUserProfileRepository(),
+          ),
+          privacyStoreProvider.overrideWithValue(MemoryPrivacyStore()),
+          dataExporterProvider.overrideWithValue((json) async {
+            exported.add(json);
+          }),
+        ],
+        child: const AiMomBabyApp(showLaunchNotice: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav_me')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('me_export')));
+    await tester.pumpAndSettle();
+    expect(exported, [AppCopy.emptyExportJson]);
+    expect(exported.single.contains('sk-'), isFalse);
+  });
+
+  testWidgets('AC-16-F03 delete clears privacyAccepted', (tester) async {
+    final privacy = MemoryPrivacyStore(accepted: true);
+    await _pumpApp(tester, privacy: privacy);
+    await tester.tap(find.byKey(const Key('nav_me')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('me_delete')));
+    await tester.pumpAndSettle();
+    expect(find.text(AppCopy.deleteConfirm), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, AppCopy.deleteData));
+    await tester.pumpAndSettle();
+    expect(await privacy.isAccepted(), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('cold start shows privacy notice then mock user week',
       (tester) async {
     await tester.pumpWidget(

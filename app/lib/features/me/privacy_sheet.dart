@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -62,12 +64,18 @@ class _PrivacySheetState extends State<PrivacySheet> {
                   ),
                   const SizedBox(height: SpacingTokens.xl),
                   FilledButton(
-                    onPressed: () async {
-                      await widget.storeRef
-                          .read(privacyStoreProvider)
-                          .setAccepted(true);
+                    key: const Key('privacy_sheet_agree'),
+                    style: const ButtonStyle(
+                      splashFactory: NoSplash.splashFactory,
+                    ),
+                    onPressed: () {
+                      unawaited(
+                        widget.storeRef
+                            .read(privacyStoreProvider)
+                            .setAccepted(true),
+                      );
                       widget.storeRef.invalidate(privacyAcceptedProvider);
-                      if (context.mounted) Navigator.pop(context);
+                      Navigator.pop(context);
                     },
                     child: Text(notice.agreeAction),
                   ),

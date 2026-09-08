@@ -9,11 +9,15 @@ abstract class PrivacyStore {
 class SharedPrefsPrivacyStore implements PrivacyStore {
   static const _key = 'privacyAccepted';
 
+  /// Session cache so agree/delete is readable before prefs I/O finishes.
+  bool? _session;
+
   @override
   Future<bool> isAccepted() async {
+    if (_session != null) return _session!;
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getBool(_key) ?? false;
+      return _session = prefs.getBool(_key) ?? false;
     } catch (e) {
       assert(() {
         debugPrint('SharedPrefsPrivacyStore.isAccepted failed: $e');
@@ -25,6 +29,7 @@ class SharedPrefsPrivacyStore implements PrivacyStore {
 
   @override
   Future<void> setAccepted(bool value) async {
+    _session = value;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_key, value);
