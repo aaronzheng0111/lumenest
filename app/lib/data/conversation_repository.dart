@@ -38,16 +38,24 @@ class ConversationListItem {
     required this.role,
     required this.lastMessageAt,
     this.preview,
+    this.type = 'SOLO',
   });
 
   final int id;
   final AgentRole role;
   final DateTime lastMessageAt;
   final String? preview;
+
+  /// SOLO | GROUP
+  final String type;
+
+  bool get isGroup => type == 'GROUP';
 }
 
 abstract class ConversationRepository {
   Future<int> getOrCreateSolo({required AgentRole role});
+
+  Future<int> getOrCreateGroup();
 
   Future<List<ChatMessage>> listMessages(int conversationId);
 
@@ -62,6 +70,7 @@ abstract class ConversationRepository {
     required AgentRole speaker,
     bool safetyBadge = false,
     List<String> sourceTitles = const [],
+    String? agentReplyRef,
   });
 
   Future<List<ConversationListItem>> listConversations();

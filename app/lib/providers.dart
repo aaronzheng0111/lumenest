@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'agent/group_consult_graph.dart';
+import 'agent/next_speaker.dart';
 import 'agent/xiaonuan_graph.dart';
 import 'agent/role_prompts.dart';
 import 'context/context_slice.dart';
@@ -143,5 +145,23 @@ final agentGraphProvider =
     slicer: ref.watch(contextSlicerProvider),
     summaryWriter: ref.watch(summaryWriterProvider),
     speaker: role,
+  );
+});
+
+/// Debug override until subscription module (12) lands. Default true for P1 QA.
+final groupConsultEnabledProvider = Provider<bool>((ref) => true);
+
+final groupConsultGraphProvider = FutureProvider<GroupConsultGraph>((ref) async {
+  final safety = await ref.watch(safetyGateProvider.future);
+  final retriever = await ref.watch(knowledgeRetrieverProvider.future);
+  final rules = await loadRouterRules();
+  return GroupConsultGraph(
+    safety: safety,
+    retriever: retriever,
+    llm: ref.watch(llmClientProvider),
+    messages: ref.watch(conversationRepositoryProvider),
+    slicer: ref.watch(contextSlicerProvider),
+    summaryWriter: ref.watch(summaryWriterProvider),
+    routerRules: rules,
   );
 });

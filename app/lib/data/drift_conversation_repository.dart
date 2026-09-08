@@ -40,6 +40,28 @@ class DriftConversationRepository implements ConversationRepository {
   }
 
   @override
+  Future<int> getOrCreateGroup() async {
+    final existing = await (_db.select(_db.conversations)
+          ..where(
+            (c) =>
+                c.userId.equals(1) &
+                c.type.equals(ConversationTypeWire.group),
+          ))
+        .get();
+    if (existing.isNotEmpty) {
+      return existing.first.id;
+    }
+    return _db.into(_db.conversations).insert(
+          ConversationsCompanion.insert(
+            userId: 1,
+            role: AgentRoleWire.xiaonuan,
+            type: ConversationTypeWire.group,
+            createdAt: DateTime.now().toUtc(),
+          ),
+        );
+  }
+
+  @override
   Future<List<ChatMessage>> listMessages(int conversationId) async {
     final rows = await (_db.select(_db.messages)
           ..where((m) => m.conversationId.equals(conversationId))
@@ -73,10 +95,12 @@ class DriftConversationRepository implements ConversationRepository {
     required AgentRole speaker,
     bool safetyBadge = false,
     List<String> sourceTitles = const [],
+    String? agentReplyRef,
   }) {
     final meta = <String, dynamic>{
       if (safetyBadge) 'safetyBadge': true,
       if (sourceTitles.isNotEmpty) 'sources': sourceTitles,
+      if (agentReplyRef != null) 'handoffRef': agentReplyRef,
     };
     return _db.into(_db.messages).insert(
           MessagesCompanion.insert(
@@ -114,6 +138,7 @@ class DriftConversationRepository implements ConversationRepository {
           role: AgentRoleX.fromWire(c.role),
           lastMessageAt: lastAt,
           preview: last.isEmpty ? null : last.first.content,
+          type: c.type,
         ),
       );
     }

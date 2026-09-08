@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'domain/agent_role.dart';
 import 'features/chat/chat_session_page.dart';
+import 'features/chat/group_chat_session_page.dart';
 import 'features/me/launch_privacy_notice_page.dart';
 import 'features/shell/app_shell.dart';
 import 'theme/app_theme.dart';
@@ -39,6 +40,12 @@ Route<void> generateAppRoute(
   bool showLaunchNotice = true,
 }) {
   final uri = Uri.parse(settings.name ?? '/');
+  if (uri.path == '/chat/group' || uri.queryParameters['type'] == 'GROUP') {
+    return MaterialPageRoute<void>(
+      settings: settings,
+      builder: (_) => const GroupChatSessionPage(),
+    );
+  }
   if (uri.path == '/chat') {
     final role = AgentRoleX.fromWire(uri.queryParameters['role']);
     return MaterialPageRoute<void>(

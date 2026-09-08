@@ -305,4 +305,39 @@ void main() {
     expect(find.text('孕16周'), findsOneWidget);
     expect(await privacy.isAccepted(), isTrue);
   });
+
+  testWidgets('AC-11-F02 group consult button opens /chat/group',
+      (tester) async {
+    final observer = _RouteRecorder();
+    await _pumpApp(tester, observers: [observer]);
+    await tester.tap(find.byKey(const Key('nav_chat')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('group_consult_btn')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('group_consult_btn')));
+    await tester.pumpAndSettle();
+    expect(observer.names.last, '/chat/group');
+    expect(find.text(AppCopy.groupConsult), findsWidgets);
+  });
+
+  testWidgets('AC-11-F02 group consult disabled shows upgrade copy',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileRepositoryProvider.overrideWithValue(
+            FakeUserProfileRepository(),
+          ),
+          privacyStoreProvider.overrideWithValue(MemoryPrivacyStore()),
+          groupConsultEnabledProvider.overrideWithValue(false),
+        ],
+        child: const AiMomBabyApp(showLaunchNotice: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav_chat')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('group_consult_btn')));
+    await tester.pumpAndSettle();
+    expect(find.text(AppCopy.groupConsultNeedsUpgrade), findsOneWidget);
+  });
 }

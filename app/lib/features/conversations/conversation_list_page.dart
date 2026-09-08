@@ -18,47 +18,94 @@ class ConversationListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(conversationListProvider);
+    final groupEnabled = ref.watch(groupConsultEnabledProvider);
     return AtmosphereBackground(
-      child: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => _EmptyConversations(),
-        data: (items) {
-          if (items.isEmpty) return const _EmptyConversations();
-          return ListView.separated(
+      child: Column(
+        children: [
+          Padding(
             padding: EdgeInsets.fromLTRB(
               SpacingTokens.pageMargin,
               MediaQuery.paddingOf(context).top + SpacingTokens.lg,
               SpacingTokens.pageMargin,
-              GlassTabBar.height + SpacingTokens.xl,
+              SpacingTokens.sm,
             ),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: SpacingTokens.sm),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return GlassContainer(
-                fill: GlassFill.medium,
-                borderRadius: RadiusTokens.borderXl,
-                child: ListTile(
-                  key: Key('conversation_${item.id}'),
-                  leading: CircleAvatar(
-                    backgroundImage: AssetImage(item.role.avatarAsset),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                key: const Key('group_consult_btn'),
+                onPressed: () {
+                  if (!groupEnabled) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(AppCopy.groupConsultNeedsUpgrade),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.of(context).pushNamed('/chat/group');
+                },
+                icon: const Icon(Icons.groups_rounded),
+                label: const Text(AppCopy.groupConsult),
+              ),
+            ),
+          ),
+          Expanded(
+            child: async.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const _EmptyConversations(),
+              data: (items) {
+                if (items.isEmpty) return const _EmptyConversations();
+                return ListView.separated(
+                  padding: EdgeInsets.fromLTRB(
+                    SpacingTokens.pageMargin,
+                    0,
+                    SpacingTokens.pageMargin,
+                    GlassTabBar.height + SpacingTokens.xl,
                   ),
-                  title: Text(item.role.displayName),
-                  subtitle: Text(
-                    item.preview ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () {
-                    Navigator.of(context).pushNamed(
-                      '/chat?role=${item.role.wireId}',
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: SpacingTokens.sm),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final title = item.isGroup
+                        ? AppCopy.groupConsult
+                        : item.role.displayName;
+                    return GlassContainer(
+                      fill: GlassFill.medium,
+                      borderRadius: RadiusTokens.borderXl,
+                      child: ListTile(
+                        key: Key('conversation_${item.id}'),
+                        leading: CircleAvatar(
+                          backgroundImage: item.isGroup
+                              ? null
+                              : AssetImage(item.role.avatarAsset),
+                          child: item.isGroup
+                              ? const Icon(Icons.groups_rounded)
+                              : null,
+                        ),
+                        title: Text(title),
+                        subtitle: Text(
+                          item.preview ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () {
+                          if (item.isGroup) {
+                            Navigator.of(context).pushNamed('/chat/group');
+                          } else {
+                            Navigator.of(context).pushNamed(
+                              '/chat?role=${item.role.wireId}',
+                            );
+                          }
+                        },
+                      ),
                     );
                   },
-                ),
-              );
-            },
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
