@@ -100,20 +100,18 @@ final conversationListProvider =
   }
 });
 
-final knowledgeRetrieverProvider = Provider<KnowledgeRetriever>((ref) {
-  return FakeKnowledgeRetriever(
-    hits: const [
-      KnowledgeHit(title: '孕期休息建议', snippet: '适度休息、保证睡眠有助于缓解疲劳。'),
-    ],
-  );
+/// Loaded from fixtures; tests may override with a sync [FakeKnowledgeRetriever].
+final knowledgeRetrieverProvider = FutureProvider<KnowledgeRetriever>((ref) {
+  return FakeSubstringRetriever.load();
 });
 
 final xiaonuanGraphProvider = FutureProvider<XiaonuanGraph>((ref) async {
   final safety = await ref.watch(safetyGateProvider.future);
+  final retriever = await ref.watch(knowledgeRetrieverProvider.future);
   final prompt = await XiaonuanGraph.loadSystemPrompt();
   return XiaonuanGraph(
     safety: safety,
-    retriever: ref.watch(knowledgeRetrieverProvider),
+    retriever: retriever,
     llm: ref.watch(llmClientProvider),
     messages: ref.watch(conversationRepositoryProvider),
     systemPrompt: prompt,

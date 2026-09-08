@@ -90,17 +90,30 @@ class ChatBubble extends StatelessWidget {
           ),
           if (message.sourceTitles.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
-              children: [
-                for (final title in message.sourceTitles)
-                  Chip(
-                    key: Key('source_chip_$title'),
-                    label: Text(title, style: Theme.of(context).textTheme.labelSmall),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                key: const Key('source_row'),
+                spacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '来源：',
+                    key: const Key('source_label'),
+                    style: Theme.of(context).textTheme.labelSmall,
                   ),
-              ],
+                  for (final title in message.sourceTitles.take(3))
+                    Chip(
+                      key: Key('source_chip_$title'),
+                      label: Text(
+                        title,
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                ],
+              ),
             ),
           ],
         ],

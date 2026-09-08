@@ -68,13 +68,13 @@ class XiaonuanGraph {
       );
     }
 
-    final hits = await retriever.retrieve(userText, k: 3);
-    final sources = hits.map((h) => h.title).toList();
+    final hits = await retriever.search(userText, k: 3);
+    final sources = hits.map((h) => h.title).take(3).toList();
     var system = systemPrompt;
     if (hits.isNotEmpty) {
       final buf = StringBuffer('\n【本地资料】\n');
       for (final h in hits) {
-        buf.writeln('- ${h.title}: ${h.snippet}');
+        buf.writeln('- ${h.title}: ${h.text}');
       }
       system = '$systemPrompt$buf';
     }

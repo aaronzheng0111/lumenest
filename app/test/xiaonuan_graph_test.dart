@@ -63,7 +63,14 @@ void main() {
     final graph = XiaonuanGraph(
       safety: _PassGate(),
       retriever: FakeKnowledgeRetriever(
-        hits: const [KnowledgeHit(title: '休息', snippet: '适度休息')],
+        hits: const [
+          KnowledgeHit(
+            id: 'kb-rest',
+            title: '休息',
+            text: '适度休息',
+            score: 1.0,
+          ),
+        ],
       ),
       llm: llm,
       messages: repo,
