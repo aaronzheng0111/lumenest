@@ -1,0 +1,5 @@
+{
+  "sample": "synthetic_cbc.png",
+  "note": "合成图，非真实病患。实现时放入 assets/test_images/",
+  "mustNotContain": ["确诊", "你得了", "每日3次每次"]
+}
