@@ -1,15 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'agent/xiaonuan_graph.dart';
+import 'data/conversation_repository.dart';
 import 'data/db/database_provider.dart';
+import 'data/drift_conversation_repository.dart';
 import 'data/drift_user_profile_repository.dart';
 import 'data/privacy_store.dart';
 import 'data/user_profile_repository.dart';
 import 'domain/user_profile_snapshot.dart';
-import 'safety/safety_audit_log.dart';
-import 'safety/safety_gate.dart';
+import 'knowledge/knowledge_retriever.dart';
 import 'llm/dio_llm_client.dart';
 import 'llm/llm_types.dart';
+import 'safety/safety_audit_log.dart';
+import 'safety/safety_gate.dart';
 
 final databaseProvider = Provider<DatabaseProvider>((ref) {
   final provider = DriftDatabaseProvider();
@@ -81,4 +85,37 @@ final llmConfigProvider = Provider<LlmConfig>((ref) {
 
 final llmClientProvider = Provider<LlmClient>((ref) {
   return DioLlmClient(config: ref.watch(llmConfigProvider));
+});
+
+final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
+  return DriftConversationRepository(ref.watch(databaseProvider));
+});
+
+final conversationListProvider =
+    FutureProvider<List<ConversationListItem>>((ref) async {
+  try {
+    return await ref.watch(conversationRepositoryProvider).listConversations();
+  } catch (_) {
+    return const [];
+  }
+});
+
+final knowledgeRetrieverProvider = Provider<KnowledgeRetriever>((ref) {
+  return FakeKnowledgeRetriever(
+    hits: const [
+      KnowledgeHit(title: '孕期休息建议', snippet: '适度休息、保证睡眠有助于缓解疲劳。'),
+    ],
+  );
+});
+
+final xiaonuanGraphProvider = FutureProvider<XiaonuanGraph>((ref) async {
+  final safety = await ref.watch(safetyGateProvider.future);
+  final prompt = await XiaonuanGraph.loadSystemPrompt();
+  return XiaonuanGraph(
+    safety: safety,
+    retriever: ref.watch(knowledgeRetrieverProvider),
+    llm: ref.watch(llmClientProvider),
+    messages: ref.watch(conversationRepositoryProvider),
+    systemPrompt: prompt,
+  );
 });

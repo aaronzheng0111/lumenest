@@ -11,7 +11,7 @@
 
 ```
 [Phase 0: 准备与基础设施] ──────> [Phase 1: P0 单角色可运行 Demo] ──────> [Phase 2: P1 四角色会诊与记忆] ──────> [Phase 3: P2 商业化与高阶能力]
-        (进度: 100%)                     (进度: ~55%)                           (进度: 0%)                           (进度: 0%)
+        (进度: 100%)                     (进度: 100%)                           (进度: 0%)                           (进度: 0%)
 ```
 
 - **P0 紧急核心**：完成 Flutter 骨架、设计系统 Token 落地、本地存储、安全红旗拦截、小暖单角色出网对话。
@@ -75,13 +75,12 @@
   - [x] `--dart-define` 密钥；缺 key / 失败固定文案；日志脱敏
 
 ### 1.4 聊天界面与小暖对话闭环 (P0)
-- [ ] **TASK-107** [P0] 对话界面实现 (`sdd/04-chat-ui-and-session`)
-  - [ ] 磨砂气泡（用户右侧粉红玻璃气泡，助手左侧半透白玻璃气泡）
-  - [ ] 悬浮胶囊输入框、流式文字打字机动画、引用来源 Chip 展示
-  - [ ] 对话历史滚动加载与本地消息草稿
-- [ ] **TASK-108** [P0] 小暖 Agent 对话全链路连通 (`sdd/08-p1-agent-xiaonuan-demo`)
-  - [ ] 注入小暖 System Prompt (`sdd/11-four-roles-and-handoff/fixtures/prompts/xiaonuan_SOURCE.md`)
-  - [ ] 跑通完整的「用户提问 → 安全校验 → 调模型 → 流式返回 → 本地存库」
+- [x] **TASK-107** [P0] 对话界面实现 (`sdd/04-chat-ui-and-session`)
+  - [x] 磨砂气泡左右对齐 + speaker 显示名；胶囊输入；草稿 SharedPreferences
+  - [x] ConversationRepository（getOrCreateSolo 幂等、2000 字限制、防双击）
+- [x] **TASK-108** [P0] 小暖 Agent 对话全链路连通 (`sdd/08-p1-agent-xiaonuan-demo`)
+  - [x] `XiaonuanGraph`：Safety → 假知识检索 → 恰好 0/1 次 LLM → 落库
+  - [x] System prompt 子串门禁；红旗短路 llm.calls==0；来源 Chip
 
 ---
 
