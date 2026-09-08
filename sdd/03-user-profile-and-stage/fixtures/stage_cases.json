@@ -1,0 +1,76 @@
+{
+  "timezone": "Asia/Shanghai",
+  "cases": [
+    {
+      "id": "prep_no_due",
+      "today": "2026-09-07",
+      "dueDate": null,
+      "birthDate": null,
+      "lastMenstruationDate": null,
+      "expectStage": "PREP",
+      "expectWeekValue": null,
+      "expectWeekUnit": null
+    },
+    {
+      "id": "pregnant_before_due",
+      "today": "2026-09-07",
+      "dueDate": "2026-12-16",
+      "birthDate": null,
+      "lastMenstruationDate": "2026-03-12",
+      "expectStage": "PREGNANT",
+      "expectWeekValue": 26,
+      "expectWeekUnit": "PREGNANCY_WEEK"
+    },
+    {
+      "id": "delivery_past_due_no_birth",
+      "today": "2026-12-17",
+      "dueDate": "2026-12-16",
+      "birthDate": null,
+      "lastMenstruationDate": "2026-03-12",
+      "expectStage": "DELIVERY",
+      "expectWeekValue": null,
+      "expectWeekUnit": null
+    },
+    {
+      "id": "delivery_day_10",
+      "today": "2026-12-26",
+      "dueDate": "2026-12-16",
+      "birthDate": "2026-12-16",
+      "lastMenstruationDate": "2026-03-12",
+      "expectStage": "DELIVERY",
+      "expectWeekValue": 2,
+      "expectWeekUnit": "POSTPARTUM_WEEK"
+    },
+    {
+      "id": "delivery_day_42",
+      "today": "2026-01-27",
+      "dueDate": "2025-12-16",
+      "birthDate": "2025-12-16",
+      "lastMenstruationDate": "2025-03-12",
+      "expectStage": "DELIVERY",
+      "expectWeekValue": 7,
+      "expectWeekUnit": "POSTPARTUM_WEEK"
+    },
+    {
+      "id": "postpartum_day_43",
+      "today": "2026-01-28",
+      "dueDate": "2025-12-16",
+      "birthDate": "2025-12-16",
+      "lastMenstruationDate": "2025-03-12",
+      "expectStage": "POSTPARTUM",
+      "expectWeekValue": 7,
+      "expectWeekUnit": "POSTPARTUM_WEEK"
+    },
+    {
+      "id": "pregnant_lmp_proxy_from_due",
+      "today": "2026-06-01",
+      "dueDate": "2026-09-07",
+      "birthDate": null,
+      "lastMenstruationDate": null,
+      "note": "LMP proxy = dueDate-280d = 2025-12-01; weeks = floor(182/7)+1 = 27",
+      "expectStage": "PREGNANT",
+      "expectWeekValue": 27,
+      "expectWeekUnit": "PREGNANCY_WEEK"
+    }
+  ]
+}
