@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'app.dart';
+import 'features/bootstrap/app_bootstrap.dart';
 import 'providers.dart';
 
 void main() {
@@ -14,7 +14,7 @@ void main() {
           (json) => Share.share(json, subject: '我的孕育数据'),
         ),
       ],
-      child: const AiMomBabyApp(),
+      child: const AppBootstrap(),
     ),
   );
 }

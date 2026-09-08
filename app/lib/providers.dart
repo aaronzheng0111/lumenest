@@ -1,10 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'data/db/database_provider.dart';
 import 'data/fixture_store.dart';
 import 'data/privacy_store.dart';
 import 'data/user_profile_repository.dart';
 import 'domain/user_profile_snapshot.dart';
+
+final databaseProvider = Provider<DatabaseProvider>((ref) {
+  final provider = DriftDatabaseProvider();
+  ref.onDispose(provider.close);
+  return provider;
+});
+
+/// Completes after seed rows exist. Failures surface the upgrade screen.
+final databaseReadyProvider = FutureProvider<void>((ref) async {
+  await ref.watch(databaseProvider).init();
+});
 
 final userProfileRepositoryProvider = Provider<UserProfileRepository>(
   (ref) => AssetMockUserProfileRepository(),

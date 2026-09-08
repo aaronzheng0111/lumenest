@@ -11,7 +11,7 @@
 
 ```
 [Phase 0: 准备与基础设施] ──────> [Phase 1: P0 单角色可运行 Demo] ──────> [Phase 2: P1 四角色会诊与记忆] ──────> [Phase 3: P2 商业化与高阶能力]
-        (进度: 100%)                     (进度: 0%)                             (进度: 0%)                           (进度: 0%)
+        (进度: 100%)                     (进度: ~20%)                           (进度: 0%)                           (进度: 0%)
 ```
 
 - **P0 紧急核心**：完成 Flutter 骨架、设计系统 Token 落地、本地存储、安全红旗拦截、小暖单角色出网对话。
@@ -58,10 +58,10 @@
   - [x] 磨砂玻璃 Sheet 弹窗交互与用户授权状态持久化（T16-01…03 P1）
 
 ### 1.2 本地数据层与领域模型 (P0)
-- [ ] **TASK-103** [P0] 本地数据库初始化与表结构设计 (`sdd/02-local-storage-and-domain`)
-  - [ ] 用户档案表 `UserProfile`（预产期、孕周计算、身体指标）
-  - [ ] 会话表 `Conversation` 与消息表 `Message`（支持单聊与群聊类型字段）
-  - [ ] 角色定义表/枚举 `AgentRole`（小暖、林医生、苏心、阿嬷）
+- [x] **TASK-103** [P0] 本地数据库初始化与表结构设计 (`sdd/02-local-storage-and-domain`)
+  - [x] Drift `AppDatabase`：users / conversations / messages / profile_events / task_cards / subscriptions + schema_meta
+  - [x] 启动 ensure 单行 user id=1 与 FREE 订阅；v1→v2 空迁移骨架；L3/L4 字段标记
+  - [x] AgentRole 等枚举 wire 值与 `assets/fixtures/enums.json` 对齐
 - [ ] **TASK-104** [P0] 孕周与阶段推导服务 (`sdd/03-user-profile-and-stage`)
   - [ ] 基于预产期自动计算孕周（如「孕16周+3天」）与关键发育提示
 

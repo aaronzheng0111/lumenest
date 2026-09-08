@@ -15,4 +15,5 @@ abstract final class AppCopy {
   static const deleteConfirm = '将删除本机档案与对话，且不可恢复';
   static const emptyExportJson =
       '{"user":{},"conversations":[],"messages":[],"profile_events":[],"task_cards":[]}';
+  static const localDataNeedsUpgrade = '本地数据需要升级，请更新应用';
 }
