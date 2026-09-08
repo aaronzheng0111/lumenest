@@ -27,8 +27,8 @@ abstract class SafetyGate {
   SafetyDecision inspect(String userText);
 }
 
-class _PatternRule {
-  _PatternRule({
+class PatternRule {
+  PatternRule({
     required this.id,
     required this.category,
     required this.type,
@@ -50,14 +50,14 @@ typedef SafetyAuditSink = void Function({
 /// Local rule engine (AC-05). Sync inspect; audit is fire-and-forget.
 class LocalSafetyGate implements SafetyGate {
   LocalSafetyGate({
-    required List<_PatternRule> rules,
+    required List<PatternRule> rules,
     required Map<String, String> replies,
     this.onAudit,
     this.conversationId,
   })  : _rules = rules,
         _replies = replies;
 
-  final List<_PatternRule> _rules;
+  final List<PatternRule> _rules;
   final Map<String, String> _replies;
   final SafetyAuditSink? onAudit;
 
@@ -106,11 +106,11 @@ class LocalSafetyGate implements SafetyGate {
     required Map<String, dynamic> hotlinesJson,
     SafetyAuditSink? onAudit,
   }) {
-    final rules = <_PatternRule>[];
+    final rules = <PatternRule>[];
     for (final raw in patternsJson['patterns'] as List<dynamic>) {
       final m = raw as Map<String, dynamic>;
       rules.add(
-        _PatternRule(
+        PatternRule(
           id: m['id'] as String,
           category: m['category'] as String,
           type: m['type'] as String,
@@ -158,7 +158,7 @@ class LocalSafetyGate implements SafetyGate {
   /// P1: case-fold; CJK text is unaffected. Full Unicode NFC deferred.
   static String _normalize(String input) => input.toLowerCase();
 
-  static bool _matches(_PatternRule rule, String normalized, String original) {
+  static bool _matches(PatternRule rule, String normalized, String original) {
     for (final p in rule.patterns) {
       if (rule.type == 'contains') {
         if (normalized.contains(p.toLowerCase()) || original.contains(p)) {

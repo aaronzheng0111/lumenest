@@ -28,4 +28,5 @@ abstract final class AppCopy {
   static const llmMissingKey = '未配置模型服务';
   static const llmLoading = '正在回复';
   static const safetyBadge = '安全提示';
+  static const maxMessageLength = '最多 2000 字';
 }
