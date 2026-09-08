@@ -24,4 +24,8 @@ abstract final class AppCopy {
   static const dueDateLabel = '预产期';
   static const birthDateLabel = '分娩日期';
   static const saveProfile = '保存';
+  static const llmRetryLater = '稍后再试';
+  static const llmMissingKey = '未配置模型服务';
+  static const llmLoading = '正在回复';
+  static const safetyBadge = '安全提示';
 }

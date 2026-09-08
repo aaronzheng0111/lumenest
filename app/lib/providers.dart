@@ -8,6 +8,8 @@ import 'data/user_profile_repository.dart';
 import 'domain/user_profile_snapshot.dart';
 import 'safety/safety_audit_log.dart';
 import 'safety/safety_gate.dart';
+import 'llm/dio_llm_client.dart';
+import 'llm/llm_types.dart';
 
 final databaseProvider = Provider<DatabaseProvider>((ref) {
   final provider = DriftDatabaseProvider();
@@ -71,4 +73,12 @@ final safetyGateProvider = FutureProvider<SafetyGate>((ref) async {
       );
     },
   );
+});
+
+final llmConfigProvider = Provider<LlmConfig>((ref) {
+  return LlmConfig.fromEnvironment();
+});
+
+final llmClientProvider = Provider<LlmClient>((ref) {
+  return DioLlmClient(config: ref.watch(llmConfigProvider));
 });

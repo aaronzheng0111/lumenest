@@ -11,7 +11,7 @@
 
 ```
 [Phase 0: 准备与基础设施] ──────> [Phase 1: P0 单角色可运行 Demo] ──────> [Phase 2: P1 四角色会诊与记忆] ──────> [Phase 3: P2 商业化与高阶能力]
-        (进度: 100%)                     (进度: ~40%)                           (进度: 0%)                           (进度: 0%)
+        (进度: 100%)                     (进度: ~55%)                           (进度: 0%)                           (进度: 0%)
 ```
 
 - **P0 紧急核心**：完成 Flutter 骨架、设计系统 Token 落地、本地存储、安全红旗拦截、小暖单角色出网对话。
@@ -70,10 +70,9 @@
 - [x] **TASK-105** [P0] 本地安全防御前置节点 (Guardrail) (`sdd/05-safety-guardrail`)
   - [x] `LocalSafetyGate` + patterns/replies/eval fixtures；拦截审计日志（不含原文）
   - [x] Chat 接入与「安全提示」徽章留给 TASK-107/108
-- [ ] **TASK-106** [P0] 出网 LLM API Client 实现 (`sdd/06-llm-api-client`)
-  - [ ] 支持 OpenAI 兼容格式 / SSE 流式响应 (Server-Sent Events)
-  - [ ] API Key 安全存储（`--dart-define` 或本地安全加密存储，禁止硬编码进 APK）
-  - [ ] 错误与超时重试策略
+- [x] **TASK-106** [P0] 出网 LLM API Client 实现 (`sdd/06-llm-api-client`)
+  - [x] OpenAI 兼容 `chat/completions`（P1 非流式）；15s 超时且禁止重试
+  - [x] `--dart-define` 密钥；缺 key / 失败固定文案；日志脱敏
 
 ### 1.4 聊天界面与小暖对话闭环 (P0)
 - [ ] **TASK-107** [P0] 对话界面实现 (`sdd/04-chat-ui-and-session`)
