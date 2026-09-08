@@ -1,0 +1,8 @@
+{
+  "plans": [
+    {"id": "FREE", "priceFen": 0, "period": "none", "dailyChatQuota": 1, "monthlyReportQuota": 0, "groupConsultEnabled": false, "allowedRoles": ["XIAONUAN"]},
+    {"id": "COMPANION", "priceFen": 2900, "period": "month", "dailyChatQuota": 5, "monthlyReportQuota": 2, "groupConsultEnabled": false, "allowedRoles": ["XIAONUAN","LIN","SUXIN","AMA"]},
+    {"id": "FULLCARE", "priceFen": 6900, "period": "month", "dailyChatQuota": 9999, "monthlyReportQuota": 9999, "groupConsultEnabled": true, "allowedRoles": ["XIAONUAN","LIN","SUXIN","AMA"]},
+    {"id": "ANNUAL", "priceFen": 69900, "period": "year", "dailyChatQuota": 9999, "monthlyReportQuota": 9999, "groupConsultEnabled": true, "allowedRoles": ["XIAONUAN","LIN","SUXIN","AMA"]}
+  ]
+}
