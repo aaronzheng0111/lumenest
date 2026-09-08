@@ -1,0 +1,10 @@
+{
+  "Stage": ["PREP", "PREGNANT", "DELIVERY", "POSTPARTUM"],
+  "AgentRole": ["XIAONUAN", "LIN", "SUXIN", "AMA"],
+  "ConversationType": ["SOLO", "GROUP"],
+  "MessageRole": ["user", "assistant", "system"],
+  "WeekUnit": ["PREGNANCY_WEEK", "POSTPARTUM_WEEK"],
+  "ProfileCategory": ["MOOD", "SYMPTOM", "EXAM", "FEEDING", "HABIT", "SUMMARY"],
+  "Plan": ["FREE", "COMPANION", "FULLCARE", "ANNUAL"],
+  "TaskStatus": ["PENDING", "DONE", "SKIPPED"]
+}
