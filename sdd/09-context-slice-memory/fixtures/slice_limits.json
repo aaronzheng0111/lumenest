@@ -1,0 +1,6 @@
+{
+  "prompt_titles": ["【档案】", "【习惯】", "【近期摘要】"],
+  "max_recent_messages": 20,
+  "summary_max_chars": 80,
+  "habit_max_chars": 500
+}
