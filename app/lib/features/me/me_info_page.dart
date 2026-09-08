@@ -73,6 +73,13 @@ class MeInfoPage extends ConsumerWidget {
                   title: AppCopy.deleteData,
                   onTap: () => _delete(context, ref),
                 ),
+                const Divider(indent: 56),
+                _MeTile(
+                  tileKey: const Key('me_clear_summaries'),
+                  icon: Icons.history_toggle_off_rounded,
+                  title: AppCopy.clearSummaries,
+                  onTap: () => _clearSummaries(context, ref),
+                ),
               ],
             ),
           ),
@@ -112,6 +119,35 @@ class MeInfoPage extends ConsumerWidget {
     if (ok == true) {
       await ref.read(privacyStoreProvider).setAccepted(false);
       ref.invalidate(privacyAcceptedProvider);
+    }
+  }
+
+  Future<void> _clearSummaries(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(AppCopy.clearSummaries),
+        content: const Text(AppCopy.clearSummariesConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(AppCopy.privacyClose),
+          ),
+          TextButton(
+            key: const Key('confirm_clear_summaries'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(AppCopy.clearSummaries),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(summaryWriterProvider).clearSummaries(userId: 1);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppCopy.clearSummariesDone)),
+        );
+      }
     }
   }
 }

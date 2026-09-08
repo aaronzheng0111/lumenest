@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import '../context/context_slice.dart';
+import '../context/drift_context_slice.dart';
 import '../data/conversation_repository.dart';
 import '../domain/agent_role.dart';
 import '../knowledge/knowledge_retriever.dart';
@@ -22,7 +24,7 @@ class GraphTurnResult {
   final int? assistantMessageId;
 }
 
-/// Hard-coded P1 graph: Safety → retrieve → LLM(0|1) → persist.
+/// Hard-coded P1 graph: Safety → retrieve → context → LLM(0|1) → persist → summary.
 class XiaonuanGraph {
   XiaonuanGraph({
     required this.safety,
@@ -30,13 +32,22 @@ class XiaonuanGraph {
     required this.llm,
     required this.messages,
     required this.systemPrompt,
-  });
+    ContextSlicer? slicer,
+    SummaryWriter? summaryWriter,
+    this.userId = 1,
+    this.speaker = AgentRole.xiaonuan,
+  })  : slicer = slicer ?? EmptyContextSlicer(),
+        summaryWriter = summaryWriter ?? NoopSummaryWriter();
 
   final SafetyGate safety;
   final KnowledgeRetriever retriever;
   final LlmClient llm;
   final ConversationRepository messages;
   final String systemPrompt;
+  final ContextSlicer slicer;
+  final SummaryWriter summaryWriter;
+  final int userId;
+  final AgentRole speaker;
 
   static const assetPromptPath =
       'assets/fixtures/prompts/xiaonuan_system_prompt.txt';
@@ -57,7 +68,7 @@ class XiaonuanGraph {
       final id = await messages.insertAssistantMessage(
         conversationId: conversationId,
         content: decision.reply ?? '',
-        speaker: AgentRole.xiaonuan,
+        speaker: speaker,
         safetyBadge: true,
       );
       return GraphTurnResult(
@@ -70,20 +81,28 @@ class XiaonuanGraph {
 
     final hits = await retriever.search(userText, k: 3);
     final sources = hits.map((h) => h.title).take(3).toList();
-    var system = systemPrompt;
+    final slice = await slicer.build(
+      userId: userId,
+      conversationId: conversationId,
+    );
+
+    var system = '${systemPrompt}\n${slice.promptBlock}';
     if (hits.isNotEmpty) {
       final buf = StringBuffer('\n【本地资料】\n');
       for (final h in hits) {
         buf.writeln('- ${h.title}: ${h.text}');
       }
-      system = '$systemPrompt$buf';
+      system = '$system$buf';
     }
 
+    final wireMessages = <ChatMessageWire>[
+      ChatMessageWire(role: 'system', content: system),
+      ...slice.recentTurns,
+      ChatMessageWire(role: 'user', content: userText),
+    ];
+
     final result = await llm.complete(
-      messages: [
-        ChatMessageWire(role: 'system', content: system),
-        ChatMessageWire(role: 'user', content: userText),
-      ],
+      messages: wireMessages,
       requestId: _requestId(),
     );
 
@@ -96,9 +115,18 @@ class XiaonuanGraph {
     final id = await messages.insertAssistantMessage(
       conversationId: conversationId,
       content: content,
-      speaker: AgentRole.xiaonuan,
+      speaker: speaker,
       sourceTitles: sources,
     );
+
+    if (result.status == LlmStatus.ok && result.content != null) {
+      // Fire-and-forget style write; await so tests can observe.
+      await summaryWriter.writeTurnSummary(
+        userId: userId,
+        assistantContent: content,
+        rawRef: 'msg:$id',
+      );
+    }
 
     return GraphTurnResult(
       assistantContent: content,

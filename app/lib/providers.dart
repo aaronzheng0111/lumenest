@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'agent/xiaonuan_graph.dart';
+import 'context/context_slice.dart';
+import 'context/drift_context_slice.dart';
 import 'data/conversation_repository.dart';
 import 'data/db/database_provider.dart';
 import 'data/drift_conversation_repository.dart';
@@ -105,6 +107,21 @@ final knowledgeRetrieverProvider = FutureProvider<KnowledgeRetriever>((ref) {
   return FakeSubstringRetriever.load();
 });
 
+final contextSlicerProvider = Provider<ContextSlicer>((ref) {
+  return DriftContextSlicer(
+    databaseProvider: ref.watch(databaseProvider),
+    profiles: ref.watch(userProfileRepositoryProvider),
+    messages: ref.watch(conversationRepositoryProvider),
+  );
+});
+
+final summaryWriterProvider = Provider<SummaryWriter>((ref) {
+  return DriftSummaryWriter(
+    databaseProvider: ref.watch(databaseProvider),
+    profiles: ref.watch(userProfileRepositoryProvider),
+  );
+});
+
 final xiaonuanGraphProvider = FutureProvider<XiaonuanGraph>((ref) async {
   final safety = await ref.watch(safetyGateProvider.future);
   final retriever = await ref.watch(knowledgeRetrieverProvider.future);
@@ -115,5 +132,7 @@ final xiaonuanGraphProvider = FutureProvider<XiaonuanGraph>((ref) async {
     llm: ref.watch(llmClientProvider),
     messages: ref.watch(conversationRepositoryProvider),
     systemPrompt: prompt,
+    slicer: ref.watch(contextSlicerProvider),
+    summaryWriter: ref.watch(summaryWriterProvider),
   );
 });
