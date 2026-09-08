@@ -1,0 +1,8 @@
+{
+  "model": "gpt-4o-mini",
+  "temperature": 0.7,
+  "messages": [
+    {"role": "system", "content": "<system prompt from 08>"},
+    {"role": "user", "content": "今天有点累"}
+  ]
+}
