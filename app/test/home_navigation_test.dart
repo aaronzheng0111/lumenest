@@ -195,4 +195,38 @@ void main() {
     expect(find.text('孕期'), findsOneWidget);
     expect(find.text('孕16周'), findsOneWidget);
   });
+
+  testWidgets('agree and continue leaves launch page for home', (tester) async {
+    final privacy = MemoryPrivacyStore();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          privacyStoreProvider.overrideWithValue(privacy),
+          userProfileRepositoryProvider.overrideWithValue(
+            FakeUserProfileRepository(
+              snapshot: const UserProfileSnapshot(
+                stage: Stage.pregnant,
+                weekValue: 16,
+              ),
+            ),
+          ),
+          dataExporterProvider.overrideWithValue((_) async {}),
+        ],
+        child: const AiMomBabyApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('launch_privacy_agree')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('launch_privacy_agree')));
+    await tester.pump();
+    // FilledButton ink sparkle never settles; poll until home is built.
+    for (var i = 0; i < 40; i++) {
+      if (find.byKey(const Key('home_week')).evaluate().isNotEmpty) break;
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(find.byKey(const Key('launch_privacy_title')), findsNothing);
+    expect(find.byKey(const Key('home_week')), findsOneWidget);
+    expect(find.text('孕16周'), findsOneWidget);
+    expect(await privacy.isAccepted(), isTrue);
+  });
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 abstract class PrivacyStore {
@@ -10,14 +11,30 @@ class SharedPrefsPrivacyStore implements PrivacyStore {
 
   @override
   Future<bool> isAccepted() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_key) ?? false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_key) ?? false;
+    } catch (e) {
+      assert(() {
+        debugPrint('SharedPrefsPrivacyStore.isAccepted failed: $e');
+        return true;
+      }());
+      return false;
+    }
   }
 
   @override
   Future<void> setAccepted(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_key, value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_key, value);
+    } catch (e) {
+      // Missing plugin / storage errors must not block leaving the launch page.
+      assert(() {
+        debugPrint('SharedPrefsPrivacyStore.setAccepted failed: $e');
+        return true;
+      }());
+    }
   }
 }
 

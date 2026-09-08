@@ -80,7 +80,10 @@ class _AppRootState extends State<AppRoot> {
   Widget build(BuildContext context) {
     if (_blocked) {
       return LaunchPrivacyNoticePage(
-        onFinished: () => setState(() => _blocked = false),
+        onFinished: () {
+          if (!mounted) return;
+          setState(() => _blocked = false);
+        },
       );
     }
     return const AppShell();

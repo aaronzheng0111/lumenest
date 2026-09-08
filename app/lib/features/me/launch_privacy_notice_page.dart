@@ -24,6 +24,28 @@ class LaunchPrivacyNoticePage extends ConsumerStatefulWidget {
 class _LaunchPrivacyNoticePageState
     extends ConsumerState<LaunchPrivacyNoticePage> {
   late final Future<PrivacyNotice> _future = loadPrivacyNotice();
+  bool _leaving = false;
+
+  void _enter() {
+    if (_leaving) return;
+    _leaving = true;
+    widget.onFinished();
+  }
+
+  void _agreeAndEnter() {
+    if (_leaving) return;
+    final store = ref.read(privacyStoreProvider);
+    // Leave immediately. Waiting on SharedPreferences previously blocked
+    // the launch page if the plugin hung or threw MissingPluginException.
+    _enter();
+    Future<void>(() async {
+      try {
+        await store.setAccepted(true);
+      } catch (e) {
+        debugPrint('privacy accept failed: $e');
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,17 +77,16 @@ class _LaunchPrivacyNoticePageState
                       width: double.infinity,
                       child: FilledButton(
                         key: const Key('launch_privacy_agree'),
-                        onPressed: () async {
-                          await ref.read(privacyStoreProvider).setAccepted(true);
-                          ref.invalidate(privacyAcceptedProvider);
-                          widget.onFinished();
-                        },
+                        style: const ButtonStyle(
+                          splashFactory: NoSplash.splashFactory,
+                        ),
+                        onPressed: _leaving ? null : _agreeAndEnter,
                         child: Text(notice.agreeAction),
                       ),
                     ),
                     TextButton(
                       key: const Key('launch_privacy_dismiss'),
-                      onPressed: widget.onFinished,
+                      onPressed: _leaving ? null : _enter,
                       child: Text(
                         notice.primaryAction,
                         style: const TextStyle(
