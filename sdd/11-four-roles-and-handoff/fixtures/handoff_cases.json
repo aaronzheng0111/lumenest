@@ -1,0 +1,10 @@
+{
+  "cases": [
+    {"id": "at_lin", "type": "GROUP", "text": "@林医生 胎盘低置要紧吗", "hasImage": false, "riskScore": 0, "expect": "LIN"},
+    {"id": "risk", "type": "GROUP", "text": "天天想哭睡不着", "hasImage": false, "riskScore": 8, "expect": "SUXIN"},
+    {"id": "image", "type": "GROUP", "text": "帮看一下", "hasImage": true, "riskScore": 0, "expect": "LIN"},
+    {"id": "food", "type": "GROUP", "text": "吐奶后还能喂奶吗", "hasImage": false, "riskScore": 0, "expect": "AMA"},
+    {"id": "default", "type": "GROUP", "text": "今天有点累", "hasImage": false, "riskScore": 0, "expect": "XIAONUAN"},
+    {"id": "solo_stays", "type": "SOLO", "soloRole": "LIN", "text": "今天有点累", "hasImage": false, "riskScore": 0, "expect": "LIN"}
+  ]
+}
