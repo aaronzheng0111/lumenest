@@ -1,0 +1,12 @@
+{
+  "flutter": "3.24.5",
+  "dart_bundled_note": "Use the Dart SDK bundled with the pinned Flutter version",
+  "android": {
+    "compileSdk": 35,
+    "minSdk": 24,
+    "targetSdk": 35,
+    "ndkSideBySide": false
+  },
+  "java_for_android_gradle": "17",
+  "flavors": ["dev", "staging", "prod"]
+}
