@@ -14,6 +14,7 @@ import '../../widgets/glass/glass_app_bar.dart';
 import '../../widgets/glass/glass_container.dart';
 import 'chat_bubble.dart';
 import 'chat_typing_indicator.dart';
+import 'llm_model_picker.dart';
 
 /// GROUP consult session (AC-11-F02 / F03).
 class GroupChatSessionPage extends ConsumerStatefulWidget {
@@ -172,7 +173,7 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
   Widget build(BuildContext context) {
     final topInset = GlassAppBar.contentHeight +
         MediaQuery.paddingOf(context).top +
-        SpacingTokens.lg;
+        SpacingTokens.sm;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -189,6 +190,7 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
         child: Column(
           children: [
             SizedBox(height: topInset),
+            const LlmModelPickerBar(),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())

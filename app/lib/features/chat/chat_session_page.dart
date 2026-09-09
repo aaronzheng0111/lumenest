@@ -15,6 +15,7 @@ import '../../widgets/glass/glass_app_bar.dart';
 import '../../widgets/glass/glass_container.dart';
 import 'chat_bubble.dart';
 import 'chat_typing_indicator.dart';
+import 'llm_model_picker.dart';
 
 class ChatSessionPage extends ConsumerStatefulWidget {
   const ChatSessionPage({super.key, required this.role});
@@ -178,7 +179,7 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
   Widget build(BuildContext context) {
     final topInset = GlassAppBar.contentHeight +
         MediaQuery.paddingOf(context).top +
-        SpacingTokens.lg;
+        SpacingTokens.sm;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -194,13 +195,15 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
       body: AtmosphereBackground(
         child: Column(
           children: [
+            SizedBox(height: topInset),
+            const LlmModelPickerBar(),
             if (_locked)
               Padding(
-                padding: EdgeInsets.fromLTRB(
-                  SpacingTokens.pageMargin,
-                  topInset,
+                padding: const EdgeInsets.fromLTRB(
                   SpacingTokens.pageMargin,
                   0,
+                  SpacingTokens.pageMargin,
+                  SpacingTokens.sm,
                 ),
                 child: GlassContainer(
                   fill: GlassFill.roseSoft,
@@ -212,9 +215,7 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
-              )
-            else
-              SizedBox(height: topInset),
+              ),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())

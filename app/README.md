@@ -1,16 +1,7 @@
 # ai_mom_baby
 
-A new Flutter project.
+Flutter app for AI-Mom-Baby. See the repo root [README](../README.md) for setup, flavors, and dart-defines.
 
-## Getting Started
+## LLM model picker
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Chat screens load the selectable model list from `assets/fixtures/llm_models.json` (symlinked to repo `assets/`). Selection is stored in SharedPreferences (`selected_llm_model_id`) and overrides `LLM_MODEL` at runtime. The 「本地演示」 entry forces offline default replies even if a key is present.

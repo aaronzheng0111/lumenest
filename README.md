@@ -86,6 +86,7 @@ flutter build apk --flavor dev --debug --dart-define-from-file=env/dev.json
 
 - `mock-user.json`：冷启动首页用的模拟档案（当前孕 16 周）
 - `privacy-notice.json`：**每次启动**弹出的隐私状况页（改 JSON 即可改文案）
+- `llm_models.json`：聊天页模型下拉目录（DeepSeek / GLM / OpenAI 兼容 / 本地演示）。新增模型：追加一条 `enabled: true` 的条目（`id`、`displayName`、`provider`、`apiModelId`、可选 `baseUrlHint`、`offline`）
 
 ## 文档入口
 

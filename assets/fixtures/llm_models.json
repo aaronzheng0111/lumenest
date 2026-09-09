@@ -1,0 +1,41 @@
+{
+  "defaultModelId": "local-demo",
+  "models": [
+    {
+      "id": "local-demo",
+      "displayName": "本地演示",
+      "provider": "offline",
+      "apiModelId": "",
+      "baseUrlHint": null,
+      "enabled": true,
+      "offline": true
+    },
+    {
+      "id": "deepseek-chat",
+      "displayName": "DeepSeek",
+      "provider": "deepseek",
+      "apiModelId": "deepseek-chat",
+      "baseUrlHint": "https://api.deepseek.com",
+      "enabled": true,
+      "offline": false
+    },
+    {
+      "id": "glm-4-flash",
+      "displayName": "GLM",
+      "provider": "zhipu",
+      "apiModelId": "glm-4-flash",
+      "baseUrlHint": "https://open.bigmodel.cn/api/paas/v4",
+      "enabled": true,
+      "offline": false
+    },
+    {
+      "id": "openai-compatible",
+      "displayName": "OpenAI 兼容",
+      "provider": "openai-compatible",
+      "apiModelId": "gpt-4o-mini",
+      "baseUrlHint": null,
+      "enabled": true,
+      "offline": false
+    }
+  ]
+}

@@ -17,6 +17,8 @@ import 'domain/agent_role.dart';
 import 'domain/user_profile_snapshot.dart';
 import 'knowledge/knowledge_retriever.dart';
 import 'llm/dio_llm_client.dart';
+import 'llm/llm_model_catalog.dart';
+import 'llm/llm_model_selection_store.dart';
 import 'llm/llm_types.dart';
 import 'safety/safety_audit_log.dart';
 import 'safety/safety_gate.dart';
@@ -87,8 +89,68 @@ final safetyGateProvider = FutureProvider<SafetyGate>((ref) async {
   );
 });
 
+final llmModelCatalogProvider = FutureProvider<LlmModelCatalog>((ref) {
+  return loadLlmModelCatalog();
+});
+
+final llmModelSelectionStoreProvider = Provider<LlmModelSelectionStore>((ref) {
+  return SharedPrefsLlmModelSelectionStore();
+});
+
+/// Persisted catalog model id (per-app). Hydrates from SharedPreferences.
+final selectedLlmModelIdProvider =
+    StateNotifierProvider<SelectedLlmModelController, String>((ref) {
+  return SelectedLlmModelController(
+    store: ref.watch(llmModelSelectionStoreProvider),
+    catalogLoader: () => ref.read(llmModelCatalogProvider.future),
+  );
+});
+
+class SelectedLlmModelController extends StateNotifier<String> {
+  SelectedLlmModelController({
+    required LlmModelSelectionStore store,
+    required Future<LlmModelCatalog> Function() catalogLoader,
+    String initialId = 'local-demo',
+  })  : _store = store,
+        _catalogLoader = catalogLoader,
+        super(initialId) {
+    _hydrate();
+  }
+
+  final LlmModelSelectionStore _store;
+  final Future<LlmModelCatalog> Function() _catalogLoader;
+
+  Future<void> _hydrate() async {
+    try {
+      final catalog = await _catalogLoader();
+      final saved = await _store.getSelectedId();
+      final resolved = catalog.resolve(saved);
+      if (!mounted) return;
+      state = resolved.id;
+    } catch (_) {
+      // Keep [initialId]; catalog errors surface in the picker UI.
+    }
+  }
+
+  Future<void> select(String id) async {
+    try {
+      final catalog = await _catalogLoader();
+      final resolved = catalog.resolve(id);
+      state = resolved.id;
+      await _store.setSelectedId(resolved.id);
+    } catch (_) {
+      state = id;
+      await _store.setSelectedId(id);
+    }
+  }
+}
+
 final llmConfigProvider = Provider<LlmConfig>((ref) {
-  return LlmConfig.fromEnvironment();
+  final env = LlmConfig.fromEnvironment();
+  final selectedId = ref.watch(selectedLlmModelIdProvider);
+  final catalog = ref.watch(llmModelCatalogProvider).valueOrNull;
+  if (catalog == null) return env;
+  return env.withModelOption(catalog.resolve(selectedId));
 });
 
 final llmClientProvider = Provider<LlmClient>((ref) {

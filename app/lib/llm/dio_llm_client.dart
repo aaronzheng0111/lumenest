@@ -3,14 +3,17 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import 'llm_model_catalog.dart';
 import 'llm_types.dart';
 
-/// Compile-time LLM config (`--dart-define`). Never hardcode keys in source.
+/// Compile-time LLM config (`--dart-define`) plus optional runtime model pick.
+/// Never hardcode keys in source.
 class LlmConfig {
   const LlmConfig({
     required this.baseUrl,
     required this.apiKey,
     required this.model,
+    this.forceOffline = false,
   });
 
   factory LlmConfig.fromEnvironment() {
@@ -25,8 +28,44 @@ class LlmConfig {
   final String apiKey;
   final String model;
 
+  /// When true (e.g. 「本地演示」), skip remote calls even if a key is set.
+  final bool forceOffline;
+
   bool get hasKey => apiKey.trim().isNotEmpty;
   bool get hasBaseUrl => baseUrl.trim().isNotEmpty;
+
+  LlmConfig copyWith({
+    String? baseUrl,
+    String? apiKey,
+    String? model,
+    bool? forceOffline,
+  }) {
+    return LlmConfig(
+      baseUrl: baseUrl ?? this.baseUrl,
+      apiKey: apiKey ?? this.apiKey,
+      model: model ?? this.model,
+      forceOffline: forceOffline ?? this.forceOffline,
+    );
+  }
+
+  /// Applies a catalog selection. Runtime [apiModelId] overrides `LLM_MODEL`.
+  /// [baseUrlHint] fills in only when env `LLM_BASE_URL` is empty.
+  LlmConfig withModelOption(LlmModelOption option) {
+    if (option.offline) {
+      return copyWith(forceOffline: true);
+    }
+    final hint = option.baseUrlHint?.trim() ?? '';
+    final resolvedBase = hasBaseUrl
+        ? baseUrl
+        : (hint.isNotEmpty ? hint : baseUrl);
+    final resolvedModel =
+        option.apiModelId.trim().isNotEmpty ? option.apiModelId.trim() : model;
+    return copyWith(
+      baseUrl: resolvedBase,
+      model: resolvedModel,
+      forceOffline: false,
+    );
+  }
 }
 
 typedef LlmLogSink = void Function(String message);
@@ -57,7 +96,8 @@ class DioLlmClient implements LlmClient {
   int requestCount = 0;
 
   @override
-  bool get canCallRemote => config.hasKey && config.hasBaseUrl;
+  bool get canCallRemote =>
+      !config.forceOffline && config.hasKey && config.hasBaseUrl;
 
   @override
   Future<LlmResult> complete({
