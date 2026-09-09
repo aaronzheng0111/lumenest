@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app_copy.dart';
 import '../../data/conversation_repository.dart';
@@ -14,6 +13,7 @@ import '../../widgets/atmosphere_background.dart';
 import '../../widgets/glass/glass_app_bar.dart';
 import '../../widgets/glass/glass_container.dart';
 import 'chat_bubble.dart';
+import 'chat_draft_store.dart';
 import 'chat_typing_indicator.dart';
 import 'llm_model_picker.dart';
 
@@ -79,16 +79,13 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
     }
   }
 
-  Future<String?> _loadDraft(int conversationId) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('chat_draft_$conversationId');
-  }
+  Future<String?> _loadDraft(int conversationId) =>
+      ChatDraftStore.load(conversationId);
 
   Future<void> _persistDraft() async {
     final id = _conversationId;
     if (id == null) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('chat_draft_$id', _controller.text);
+    await ChatDraftStore.save(id, _controller.text);
   }
 
   void _scrollToEnd() {

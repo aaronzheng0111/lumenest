@@ -10,7 +10,6 @@ import 'package:ai_mom_baby/context/drift_context_slice.dart';
 import 'package:ai_mom_baby/data/db/database_provider.dart';
 import 'package:ai_mom_baby/data/db/domain_enums.dart';
 import 'package:ai_mom_baby/data/drift_conversation_repository.dart';
-import 'package:ai_mom_baby/data/drift_user_profile_repository.dart';
 import 'package:ai_mom_baby/domain/agent_role.dart';
 import 'package:ai_mom_baby/knowledge/knowledge_retriever.dart';
 import 'package:ai_mom_baby/llm/llm_types.dart';
@@ -72,7 +71,6 @@ void main() {
     await db.init();
     addTearDown(db.close);
     final repo = DriftConversationRepository(db);
-    final profiles = DriftUserProfileRepository(db);
     final llm = _CountingLlm();
     final graph = GroupConsultGraph(
       safety: _PassGate(),

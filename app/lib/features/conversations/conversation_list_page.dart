@@ -56,7 +56,7 @@ class ConversationListPage extends ConsumerWidget {
               data: (items) {
                 if (items.isEmpty) return const _EmptyConversations();
                 return ListView.separated(
-                  padding: EdgeInsets.fromLTRB(
+                  padding: const EdgeInsets.fromLTRB(
                     SpacingTokens.pageMargin,
                     0,
                     SpacingTokens.pageMargin,

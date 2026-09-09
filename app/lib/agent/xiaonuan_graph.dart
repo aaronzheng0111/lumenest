@@ -104,7 +104,7 @@ class XiaonuanGraph {
       conversationId: conversationId,
     );
 
-    var system = '${systemPrompt}\n${slice.promptBlock}';
+    var system = '$systemPrompt\n${slice.promptBlock}';
     if (hits.isNotEmpty) {
       final buf = StringBuffer('\n【本地资料】\n');
       for (final h in hits) {

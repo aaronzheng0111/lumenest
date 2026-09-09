@@ -11,7 +11,6 @@ import 'package:ai_mom_baby/data/user_profile_repository.dart';
 import 'package:ai_mom_baby/domain/stage.dart';
 import 'package:ai_mom_baby/domain/user_profile_snapshot.dart';
 import 'package:ai_mom_baby/providers.dart';
-import 'package:ai_mom_baby/tasks/task_cards.dart';
 
 class _RouteRecorder extends NavigatorObserver {
   final names = <String?>[];

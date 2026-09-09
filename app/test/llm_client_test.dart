@@ -157,7 +157,6 @@ class _ScriptedResponse {
   _ScriptedResponse({
     required this.statusCode,
     required this.body,
-    this.delay = Duration.zero,
     this.timeout = false,
   });
 
@@ -166,7 +165,6 @@ class _ScriptedResponse {
 
   final int statusCode;
   final Map<String, dynamic> body;
-  final Duration delay;
   final bool timeout;
 }
 
@@ -194,9 +192,6 @@ class _ScriptedAdapter implements HttpClientAdapter {
         requestOptions: options,
         type: DioExceptionType.receiveTimeout,
       );
-    }
-    if (scripted.delay > Duration.zero) {
-      await Future<void>.delayed(scripted.delay);
     }
     final bytes = utf8.encode(jsonEncode(scripted.body));
     return ResponseBody.fromString(
