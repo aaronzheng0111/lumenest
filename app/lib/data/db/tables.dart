@@ -3,7 +3,7 @@ import 'package:drift/drift.dart';
 /// Local tables for sdd/02. UI must not import generated Drift code.
 /// Enum wire values: `sdd/02-local-storage-and-domain/fixtures/enums.json`.
 
-/// t_user — single-row MVP (`id` always 1).
+/// t_user — local multi-account (active id in SharedPreferences).
 class Users extends Table {
   IntColumn get id => integer()();
 
@@ -24,6 +24,9 @@ class Users extends Table {
   IntColumn get pregnancyWeek => integer().nullable()();
 
   IntColumn get postpartumWeek => integer().nullable()();
+
+  /// Rich optional profile JSON ([RichUserProfile.encode]).
+  TextColumn get profileJson => text().withDefault(const Constant('{}'))();
 
   DateTimeColumn get createdAt => dateTime()();
 

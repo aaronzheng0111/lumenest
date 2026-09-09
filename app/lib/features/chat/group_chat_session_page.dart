@@ -37,6 +37,8 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
   List<AgentTool> _pendingTools = const [];
   int? _revealMessageId;
   DateTime? _lastSendAt;
+  String? _streamingText;
+  AgentRole? _streamingSpeaker;
 
   bool get _showSuggestions =>
       !_loading &&
@@ -168,6 +170,8 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
       _sending = true;
       _awaitingReply = true;
       _pendingTools = pendingTools;
+      _streamingText = null;
+      _streamingSpeaker = null;
     });
     _controller.clear();
     await _persistDraft();
@@ -188,12 +192,40 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
       final turn = await graph.handle(
         conversationId: conversationId,
         userText: text,
+        onPartial: (speaker, partial) {
+          if (!mounted) return;
+          setState(() {
+            _awaitingReply = false;
+            _pendingTools = const [];
+            _streamingSpeaker = speaker;
+            _streamingText = partial;
+          });
+          _scrollToEnd();
+        },
+        onSpeakerPersisted: () async {
+          final msgs = await repo.listMessages(conversationId);
+          if (!mounted) return;
+          setState(() {
+            _messages = msgs;
+            _streamingText = null;
+            _streamingSpeaker = null;
+            // Brief "正在回复" while the next speaker prepares (cleared on
+            // first token or when handle() finishes).
+            _awaitingReply = true;
+          });
+          _scrollToEnd();
+        },
       );
       final afterAssistant = await repo.listMessages(conversationId);
       if (mounted) {
         setState(() {
           _messages = afterAssistant;
-          _revealMessageId = turn.assistantMessageId;
+          _streamingText = null;
+          _streamingSpeaker = null;
+          _awaitingReply = false;
+          _revealMessageId = (turn.usedOfflineDefault || turn.blockedBySafety)
+              ? turn.assistantMessageId
+              : null;
         });
         _scrollToEnd();
       }
@@ -207,6 +239,8 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
           _sending = false;
           _awaitingReply = false;
           _pendingTools = const [];
+          _streamingText = null;
+          _streamingSpeaker = null;
         });
       }
     }
@@ -304,9 +338,27 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
                       padding: const EdgeInsets.symmetric(
                         horizontal: SpacingTokens.pageMargin,
                       ),
-                      itemCount: _messages.length + (_awaitingReply ? 1 : 0),
+                      itemCount: _messages.length +
+                          (_awaitingReply || _streamingText != null ? 1 : 0),
                       itemBuilder: (context, index) {
-                        if (_awaitingReply && index == _messages.length) {
+                        if (index == _messages.length) {
+                          final streaming = _streamingText;
+                          if (streaming != null) {
+                            final speaker =
+                                _streamingSpeaker ?? AgentRole.xiaonuan;
+                            return ChatBubble(
+                              key: const Key('streaming_bubble'),
+                              message: ChatMessage(
+                                id: -1,
+                                conversationId: _conversationId ?? 0,
+                                role: 'assistant',
+                                content: streaming,
+                                createdAt: DateTime.now(),
+                                speakerRole: speaker.wireId,
+                              ),
+                              showActions: false,
+                            );
+                          }
                           return ChatAwaitingReply(tools: _pendingTools);
                         }
                         final msg = _messages[index];

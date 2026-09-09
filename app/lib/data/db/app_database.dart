@@ -23,7 +23,7 @@ class AppDatabase extends _$AppDatabase {
   final int? _schemaVersionOverride;
 
   /// Current schema. Bump with a no-op/data migration in [migration].
-  static const int currentSchemaVersion = 2;
+  static const int currentSchemaVersion = 3;
 
   /// Tables required by AC-02-B02 (+ schema_meta).
   static const requiredTableNames = {
@@ -49,6 +49,14 @@ class AppDatabase extends _$AppDatabase {
           // v1 → v2: empty scaffold (T02-05). Keep users intact.
           if (from < 2 && to >= 2) {
             // no-op
+          }
+          // v2 → v3: rich profile JSON + multi-account ready.
+          if (from < 3 && to >= 3) {
+            final cols = await customSelect("PRAGMA table_info('users')").get();
+            final names = cols.map((r) => r.read<String>('name')).toSet();
+            if (!names.contains('profile_json')) {
+              await m.addColumn(users, users.profileJson);
+            }
           }
           await _writeSchemaMeta(to);
         },

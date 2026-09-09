@@ -10,6 +10,9 @@ enum AgentTool {
 
   /// Wall-clock time — safe for all roles; used to exercise tool wiring.
   getCurrentTime,
+
+  /// Patch rich profile / daily check-in via the shared profile repository.
+  updateProfile,
 }
 
 /// Static ACL table — unauthorized calls must be rejected by the graph.
@@ -19,23 +22,27 @@ abstract final class ToolAcl {
       AgentTool.retrieveKb,
       AgentTool.readContext,
       AgentTool.getCurrentTime,
+      AgentTool.updateProfile,
     },
     AgentRole.lin: {
       AgentTool.retrieveKb,
       AgentTool.readContext,
       AgentTool.getCurrentTime,
+      AgentTool.updateProfile,
     },
     AgentRole.suxin: {
       AgentTool.readContext,
       AgentTool.crisisTemplate,
       AgentTool.retrieveKb,
       AgentTool.getCurrentTime,
+      AgentTool.updateProfile,
     },
     AgentRole.ama: {
       AgentTool.retrieveKb,
       AgentTool.upsertHabit,
       AgentTool.toggleTask,
       AgentTool.getCurrentTime,
+      AgentTool.updateProfile,
     },
   };
 

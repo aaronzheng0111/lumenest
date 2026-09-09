@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 import '../domain/privacy_notice.dart';
+import '../domain/rich_user_profile.dart';
 import '../domain/stage.dart';
 import '../domain/user_profile_snapshot.dart';
 import 'user_profile_repository.dart';
@@ -24,6 +25,31 @@ Future<PrivacyNotice> loadPrivacyNotice() async {
 /// Reads `assets/fixtures/mock-user.json` for cold-start demos without Drift edits.
 class AssetMockUserProfileRepository implements UserProfileRepository {
   int getSnapshotCalls = 0;
+  RichUserProfile _rich = const RichUserProfile();
+  int _activeId = 1;
+
+  @override
+  Future<int> getActiveUserId() async => _activeId;
+
+  @override
+  Future<List<LocalAccount>> listAccounts() async => [
+        LocalAccount(id: _activeId, nickname: '妈妈', isActive: true),
+      ];
+
+  @override
+  Future<int> createAccount({
+    String nickname = '妈妈',
+    bool switchTo = true,
+  }) async {
+    final id = _activeId + 1;
+    if (switchTo) _activeId = id;
+    return id;
+  }
+
+  @override
+  Future<void> switchAccount(int userId) async {
+    _activeId = userId;
+  }
 
   @override
   Future<UserProfileSnapshot> getSnapshot({DateTime? today}) async {
@@ -35,6 +61,7 @@ class AssetMockUserProfileRepository implements UserProfileRepository {
         stage: StageX.fromWire(json['stage'] as String?),
         weekValue: json['weekValue'] as int?,
         weekUnit: json['weekUnit'] as String?,
+        rich: _rich,
       );
     } catch (_) {
       return UserProfileSnapshot.fallback;
@@ -48,6 +75,22 @@ class AssetMockUserProfileRepository implements UserProfileRepository {
 
   @override
   Future<void> saveEdits(ProfileEdits edits, {DateTime? today}) async {
-    // Mock asset store is read-only in P0 demos.
+    // Mock asset store is read-only for stage columns in P0 demos.
+  }
+
+  @override
+  Future<RichUserProfile> loadRichProfile() async => _rich;
+
+  @override
+  Future<void> saveRichProfile(RichUserProfile profile) async {
+    _rich = profile;
+  }
+
+  @override
+  Future<RichUserProfile> updateRichProfile(
+    RichUserProfile Function(RichUserProfile current) transform,
+  ) async {
+    _rich = transform(_rich);
+    return _rich;
   }
 }

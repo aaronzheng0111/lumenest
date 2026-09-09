@@ -58,6 +58,14 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
   late final GeneratedColumn<int> postpartumWeek = GeneratedColumn<int>(
       'postpartum_week', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _profileJsonMeta =
+      const VerificationMeta('profileJson');
+  @override
+  late final GeneratedColumn<String> profileJson = GeneratedColumn<String>(
+      'profile_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('{}'));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -80,6 +88,7 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         birthDate,
         pregnancyWeek,
         postpartumWeek,
+        profileJson,
         createdAt,
         updatedAt
       ];
@@ -130,6 +139,12 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
           postpartumWeek.isAcceptableOrUnknown(
               data['postpartum_week']!, _postpartumWeekMeta));
     }
+    if (data.containsKey('profile_json')) {
+      context.handle(
+          _profileJsonMeta,
+          profileJson.isAcceptableOrUnknown(
+              data['profile_json']!, _profileJsonMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -168,6 +183,8 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
           .read(DriftSqlType.int, data['${effectivePrefix}pregnancy_week']),
       postpartumWeek: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}postpartum_week']),
+      profileJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}profile_json'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -198,6 +215,9 @@ class User extends DataClass implements Insertable<User> {
   final DateTime? birthDate;
   final int? pregnancyWeek;
   final int? postpartumWeek;
+
+  /// Rich optional profile JSON ([RichUserProfile.encode]).
+  final String profileJson;
   final DateTime createdAt;
   final DateTime updatedAt;
   const User(
@@ -209,6 +229,7 @@ class User extends DataClass implements Insertable<User> {
       this.birthDate,
       this.pregnancyWeek,
       this.postpartumWeek,
+      required this.profileJson,
       required this.createdAt,
       required this.updatedAt});
   @override
@@ -232,6 +253,7 @@ class User extends DataClass implements Insertable<User> {
     if (!nullToAbsent || postpartumWeek != null) {
       map['postpartum_week'] = Variable<int>(postpartumWeek);
     }
+    map['profile_json'] = Variable<String>(profileJson);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -257,6 +279,7 @@ class User extends DataClass implements Insertable<User> {
       postpartumWeek: postpartumWeek == null && nullToAbsent
           ? const Value.absent()
           : Value(postpartumWeek),
+      profileJson: Value(profileJson),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -275,6 +298,7 @@ class User extends DataClass implements Insertable<User> {
       birthDate: serializer.fromJson<DateTime?>(json['birthDate']),
       pregnancyWeek: serializer.fromJson<int?>(json['pregnancyWeek']),
       postpartumWeek: serializer.fromJson<int?>(json['postpartumWeek']),
+      profileJson: serializer.fromJson<String>(json['profileJson']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -292,6 +316,7 @@ class User extends DataClass implements Insertable<User> {
       'birthDate': serializer.toJson<DateTime?>(birthDate),
       'pregnancyWeek': serializer.toJson<int?>(pregnancyWeek),
       'postpartumWeek': serializer.toJson<int?>(postpartumWeek),
+      'profileJson': serializer.toJson<String>(profileJson),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -306,6 +331,7 @@ class User extends DataClass implements Insertable<User> {
           Value<DateTime?> birthDate = const Value.absent(),
           Value<int?> pregnancyWeek = const Value.absent(),
           Value<int?> postpartumWeek = const Value.absent(),
+          String? profileJson,
           DateTime? createdAt,
           DateTime? updatedAt}) =>
       User(
@@ -321,6 +347,7 @@ class User extends DataClass implements Insertable<User> {
             pregnancyWeek.present ? pregnancyWeek.value : this.pregnancyWeek,
         postpartumWeek:
             postpartumWeek.present ? postpartumWeek.value : this.postpartumWeek,
+        profileJson: profileJson ?? this.profileJson,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -340,6 +367,8 @@ class User extends DataClass implements Insertable<User> {
       postpartumWeek: data.postpartumWeek.present
           ? data.postpartumWeek.value
           : this.postpartumWeek,
+      profileJson:
+          data.profileJson.present ? data.profileJson.value : this.profileJson,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -356,6 +385,7 @@ class User extends DataClass implements Insertable<User> {
           ..write('birthDate: $birthDate, ')
           ..write('pregnancyWeek: $pregnancyWeek, ')
           ..write('postpartumWeek: $postpartumWeek, ')
+          ..write('profileJson: $profileJson, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -363,8 +393,18 @@ class User extends DataClass implements Insertable<User> {
   }
 
   @override
-  int get hashCode => Object.hash(id, nickname, stage, lastMenstruationDate,
-      dueDate, birthDate, pregnancyWeek, postpartumWeek, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+      id,
+      nickname,
+      stage,
+      lastMenstruationDate,
+      dueDate,
+      birthDate,
+      pregnancyWeek,
+      postpartumWeek,
+      profileJson,
+      createdAt,
+      updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -377,6 +417,7 @@ class User extends DataClass implements Insertable<User> {
           other.birthDate == this.birthDate &&
           other.pregnancyWeek == this.pregnancyWeek &&
           other.postpartumWeek == this.postpartumWeek &&
+          other.profileJson == this.profileJson &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -390,6 +431,7 @@ class UsersCompanion extends UpdateCompanion<User> {
   final Value<DateTime?> birthDate;
   final Value<int?> pregnancyWeek;
   final Value<int?> postpartumWeek;
+  final Value<String> profileJson;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const UsersCompanion({
@@ -401,6 +443,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     this.birthDate = const Value.absent(),
     this.pregnancyWeek = const Value.absent(),
     this.postpartumWeek = const Value.absent(),
+    this.profileJson = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -413,6 +456,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     this.birthDate = const Value.absent(),
     this.pregnancyWeek = const Value.absent(),
     this.postpartumWeek = const Value.absent(),
+    this.profileJson = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   })  : createdAt = Value(createdAt),
@@ -426,6 +470,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     Expression<DateTime>? birthDate,
     Expression<int>? pregnancyWeek,
     Expression<int>? postpartumWeek,
+    Expression<String>? profileJson,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -439,6 +484,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       if (birthDate != null) 'birth_date': birthDate,
       if (pregnancyWeek != null) 'pregnancy_week': pregnancyWeek,
       if (postpartumWeek != null) 'postpartum_week': postpartumWeek,
+      if (profileJson != null) 'profile_json': profileJson,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -453,6 +499,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       Value<DateTime?>? birthDate,
       Value<int?>? pregnancyWeek,
       Value<int?>? postpartumWeek,
+      Value<String>? profileJson,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
     return UsersCompanion(
@@ -464,6 +511,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       birthDate: birthDate ?? this.birthDate,
       pregnancyWeek: pregnancyWeek ?? this.pregnancyWeek,
       postpartumWeek: postpartumWeek ?? this.postpartumWeek,
+      profileJson: profileJson ?? this.profileJson,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -497,6 +545,9 @@ class UsersCompanion extends UpdateCompanion<User> {
     if (postpartumWeek.present) {
       map['postpartum_week'] = Variable<int>(postpartumWeek.value);
     }
+    if (profileJson.present) {
+      map['profile_json'] = Variable<String>(profileJson.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -517,6 +568,7 @@ class UsersCompanion extends UpdateCompanion<User> {
           ..write('birthDate: $birthDate, ')
           ..write('pregnancyWeek: $pregnancyWeek, ')
           ..write('postpartumWeek: $postpartumWeek, ')
+          ..write('profileJson: $profileJson, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -2787,6 +2839,7 @@ typedef $$UsersTableCreateCompanionBuilder = UsersCompanion Function({
   Value<DateTime?> birthDate,
   Value<int?> pregnancyWeek,
   Value<int?> postpartumWeek,
+  Value<String> profileJson,
   required DateTime createdAt,
   required DateTime updatedAt,
 });
@@ -2799,6 +2852,7 @@ typedef $$UsersTableUpdateCompanionBuilder = UsersCompanion Function({
   Value<DateTime?> birthDate,
   Value<int?> pregnancyWeek,
   Value<int?> postpartumWeek,
+  Value<String> profileJson,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -2836,6 +2890,9 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
   ColumnFilters<int> get postpartumWeek => $composableBuilder(
       column: $table.postpartumWeek,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get profileJson => $composableBuilder(
+      column: $table.profileJson, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -2880,6 +2937,9 @@ class $$UsersTableOrderingComposer
       column: $table.postpartumWeek,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get profileJson => $composableBuilder(
+      column: $table.profileJson, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -2920,6 +2980,9 @@ class $$UsersTableAnnotationComposer
   GeneratedColumn<int> get postpartumWeek => $composableBuilder(
       column: $table.postpartumWeek, builder: (column) => column);
 
+  GeneratedColumn<String> get profileJson => $composableBuilder(
+      column: $table.profileJson, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -2958,6 +3021,7 @@ class $$UsersTableTableManager extends RootTableManager<
             Value<DateTime?> birthDate = const Value.absent(),
             Value<int?> pregnancyWeek = const Value.absent(),
             Value<int?> postpartumWeek = const Value.absent(),
+            Value<String> profileJson = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -2970,6 +3034,7 @@ class $$UsersTableTableManager extends RootTableManager<
             birthDate: birthDate,
             pregnancyWeek: pregnancyWeek,
             postpartumWeek: postpartumWeek,
+            profileJson: profileJson,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),
@@ -2982,6 +3047,7 @@ class $$UsersTableTableManager extends RootTableManager<
             Value<DateTime?> birthDate = const Value.absent(),
             Value<int?> pregnancyWeek = const Value.absent(),
             Value<int?> postpartumWeek = const Value.absent(),
+            Value<String> profileJson = const Value.absent(),
             required DateTime createdAt,
             required DateTime updatedAt,
           }) =>
@@ -2994,6 +3060,7 @@ class $$UsersTableTableManager extends RootTableManager<
             birthDate: birthDate,
             pregnancyWeek: pregnancyWeek,
             postpartumWeek: postpartumWeek,
+            profileJson: profileJson,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),

@@ -42,6 +42,8 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
   List<AgentTool> _pendingTools = const [];
   int? _revealMessageId;
   DateTime? _lastSendAt;
+  String? _streamingText;
+  AgentRole? _streamingSpeaker;
 
   bool get _locked => !widget.role.isUnlocked;
 
@@ -179,6 +181,8 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
       _sending = true;
       _awaitingReply = true;
       _pendingTools = pendingTools;
+      _streamingText = null;
+      _streamingSpeaker = null;
     });
     _controller.clear();
     await _persistDraft();
@@ -201,6 +205,16 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
         turn = await graph.handle(
           conversationId: conversationId,
           userText: text,
+          onPartial: (speaker, partial) {
+            if (!mounted) return;
+            setState(() {
+              _awaitingReply = false;
+              _pendingTools = const [];
+              _streamingSpeaker = speaker;
+              _streamingText = partial;
+            });
+            _scrollToEnd();
+          },
         );
       } catch (e, st) {
         debugPrint('chat graph failed, using offline fallback: $e\n$st');
@@ -230,7 +244,13 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
       if (mounted) {
         setState(() {
           _messages = afterAssistant;
-          _revealMessageId = turn.assistantMessageId;
+          _streamingText = null;
+          _streamingSpeaker = null;
+          _awaitingReply = false;
+          // Fake typewriter only for offline/safety one-shot replies.
+          _revealMessageId = (turn.usedOfflineDefault || turn.blockedBySafety)
+              ? turn.assistantMessageId
+              : null;
         });
         _scrollToEnd();
       }
@@ -243,6 +263,8 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
           _sending = false;
           _awaitingReply = false;
           _pendingTools = const [];
+          _streamingText = null;
+          _streamingSpeaker = null;
         });
       }
     }
@@ -372,9 +394,26 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
                       padding: const EdgeInsets.symmetric(
                         horizontal: SpacingTokens.pageMargin,
                       ),
-                      itemCount: _messages.length + (_awaitingReply ? 1 : 0),
+                      itemCount: _messages.length +
+                          (_awaitingReply || _streamingText != null ? 1 : 0),
                       itemBuilder: (context, index) {
-                        if (_awaitingReply && index == _messages.length) {
+                        if (index == _messages.length) {
+                          final streaming = _streamingText;
+                          if (streaming != null) {
+                            final speaker = _streamingSpeaker ?? widget.role;
+                            return ChatBubble(
+                              key: const Key('streaming_bubble'),
+                              message: ChatMessage(
+                                id: -1,
+                                conversationId: _conversationId ?? 0,
+                                role: 'assistant',
+                                content: streaming,
+                                createdAt: DateTime.now(),
+                                speakerRole: speaker.wireId,
+                              ),
+                              showActions: false,
+                            );
+                          }
                           return ChatAwaitingReply(tools: _pendingTools);
                         }
                         final msg = _messages[index];

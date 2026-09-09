@@ -112,6 +112,35 @@ class DioLlmClient implements LlmClient {
   bool get canCallRemote =>
       !config.forceOffline && config.hasKey && config.hasBaseUrl;
 
+  Map<String, dynamic> _requestBody(
+    List<ChatMessageWire> messages, {
+    required bool stream,
+  }) {
+    return {
+      'model': config.model,
+      'temperature': temperature,
+      'messages': messages.map((m) => m.toJson()).toList(),
+      if (stream) 'stream': true,
+    };
+  }
+
+  Options _authOptions(String requestId, {ResponseType? responseType}) {
+    return Options(
+      responseType: responseType,
+      headers: {
+        'Authorization': 'Bearer ${config.apiKey}',
+        'Content-Type': 'application/json',
+        'x-request-id': requestId,
+        if (responseType == ResponseType.stream) 'Accept': 'text/event-stream',
+      },
+      // Streaming replies often exceed the 15s one-shot budget; idle between
+      // SSE chunks still fails closed if the provider stalls.
+      receiveTimeout: responseType == ResponseType.stream
+          ? const Duration(seconds: 90)
+          : null,
+    );
+  }
+
   @override
   Future<LlmResult> complete({
     required List<ChatMessageWire> messages,
@@ -129,18 +158,8 @@ class DioLlmClient implements LlmClient {
     try {
       final response = await _dio.post<dynamic>(
         url,
-        data: {
-          'model': config.model,
-          'temperature': temperature,
-          'messages': messages.map((m) => m.toJson()).toList(),
-        },
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${config.apiKey}',
-            'Content-Type': 'application/json',
-            'x-request-id': requestId,
-          },
-        ),
+        data: _requestBody(messages, stream: false),
+        options: _authOptions(requestId),
       );
       sw.stop();
       final statusCode = response.statusCode ?? 0;
@@ -159,26 +178,7 @@ class DioLlmClient implements LlmClient {
       return _parseOk(response.data, sw.elapsedMilliseconds, statusCode);
     } on DioException catch (e) {
       sw.stop();
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.sendTimeout ||
-          e.type == DioExceptionType.receiveTimeout) {
-        _safeLog(
-          'llm timeout latencyMs=${sw.elapsedMilliseconds} requestId=$requestId',
-        );
-        return LlmResult(
-          status: LlmStatus.timeout,
-          latencyMs: sw.elapsedMilliseconds,
-        );
-      }
-      final code = e.response?.statusCode;
-      _safeLog(
-        'llm httpError status=$code latencyMs=${sw.elapsedMilliseconds} requestId=$requestId',
-      );
-      return LlmResult(
-        status: LlmStatus.httpError,
-        httpStatus: code,
-        latencyMs: sw.elapsedMilliseconds,
-      );
+      return _mapDioException(e, sw.elapsedMilliseconds, requestId);
     } catch (e) {
       sw.stop();
       _safeLog('llm parseError requestId=$requestId');
@@ -187,6 +187,115 @@ class DioLlmClient implements LlmClient {
         latencyMs: sw.elapsedMilliseconds,
       );
     }
+  }
+
+  @override
+  Stream<LlmStreamEvent> streamComplete({
+    required List<ChatMessageWire> messages,
+    required String requestId,
+  }) async* {
+    if (!canCallRemote) {
+      _safeLog('llm missingKey requestId=$requestId');
+      yield const LlmStreamEnd(LlmResult(status: LlmStatus.missingKey));
+      return;
+    }
+
+    final url = buildChatCompletionsUrl(config.baseUrl);
+    final sw = Stopwatch()..start();
+    requestCount++;
+
+    try {
+      final response = await _dio.post<ResponseBody>(
+        url,
+        data: _requestBody(messages, stream: true),
+        options: _authOptions(requestId, responseType: ResponseType.stream),
+      );
+      final statusCode = response.statusCode ?? 0;
+      if (statusCode < 200 || statusCode >= 300) {
+        sw.stop();
+        _safeLog(
+          'llm status=$statusCode latencyMs=${sw.elapsedMilliseconds} requestId=$requestId',
+        );
+        yield LlmStreamEnd(
+          LlmResult(
+            status: LlmStatus.httpError,
+            httpStatus: statusCode,
+            latencyMs: sw.elapsedMilliseconds,
+          ),
+        );
+        return;
+      }
+
+      final body = response.data;
+      if (body == null) {
+        sw.stop();
+        yield LlmStreamEnd(
+          LlmResult(
+            status: LlmStatus.parseError,
+            httpStatus: statusCode,
+            latencyMs: sw.elapsedMilliseconds,
+          ),
+        );
+        return;
+      }
+
+      final buffer = StringBuffer();
+      await for (final delta in parseOpenAiSse(body.stream)) {
+        buffer.write(delta.text);
+        yield delta;
+      }
+
+      sw.stop();
+      _safeLog(
+        'llm status=$statusCode latencyMs=${sw.elapsedMilliseconds} requestId=$requestId stream=1',
+      );
+      if (buffer.isEmpty) {
+        yield LlmStreamEnd(
+          LlmResult(
+            status: LlmStatus.parseError,
+            httpStatus: statusCode,
+            latencyMs: sw.elapsedMilliseconds,
+          ),
+        );
+        return;
+      }
+      yield LlmStreamEnd(
+        LlmResult(
+          status: LlmStatus.ok,
+          content: buffer.toString(),
+          httpStatus: statusCode,
+          latencyMs: sw.elapsedMilliseconds,
+        ),
+      );
+    } on DioException catch (e) {
+      sw.stop();
+      yield LlmStreamEnd(_mapDioException(e, sw.elapsedMilliseconds, requestId));
+    } catch (_) {
+      sw.stop();
+      _safeLog('llm parseError requestId=$requestId stream=1');
+      yield LlmStreamEnd(
+        LlmResult(
+          status: LlmStatus.parseError,
+          latencyMs: sw.elapsedMilliseconds,
+        ),
+      );
+    }
+  }
+
+  LlmResult _mapDioException(DioException e, int latencyMs, String requestId) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout) {
+      _safeLog('llm timeout latencyMs=$latencyMs requestId=$requestId');
+      return LlmResult(status: LlmStatus.timeout, latencyMs: latencyMs);
+    }
+    final code = e.response?.statusCode;
+    _safeLog('llm httpError status=$code latencyMs=$latencyMs requestId=$requestId');
+    return LlmResult(
+      status: LlmStatus.httpError,
+      httpStatus: code,
+      latencyMs: latencyMs,
+    );
   }
 
   LlmResult _parseOk(dynamic data, int latencyMs, int statusCode) {
@@ -252,5 +361,36 @@ class DioLlmClient implements LlmClient {
           debugPrint(m);
         };
     sink(message);
+  }
+}
+
+/// Parses OpenAI-compatible `text/event-stream` into text [LlmStreamDelta]s.
+/// Stops on `data: [DONE]`. Ignores keep-alives and malformed lines.
+Stream<LlmStreamDelta> parseOpenAiSse(Stream<List<int>> byteStream) async* {
+  final lines = utf8.decoder.bind(byteStream).transform(const LineSplitter());
+  await for (final line in lines) {
+    if (line.isEmpty || line.startsWith(':')) continue;
+    if (!line.startsWith('data:')) continue;
+    final payload = line.substring(5).trim();
+    if (payload.isEmpty) continue;
+    if (payload == '[DONE]') return;
+
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(payload);
+    } catch (_) {
+      continue;
+    }
+    if (decoded is! Map) continue;
+    final choices = decoded['choices'];
+    if (choices is! List || choices.isEmpty) continue;
+    final first = choices.first;
+    if (first is! Map) continue;
+    final delta = first['delta'];
+    if (delta is! Map) continue;
+    final content = delta['content'];
+    if (content is String && content.isNotEmpty) {
+      yield LlmStreamDelta(content);
+    }
   }
 }

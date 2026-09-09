@@ -14,15 +14,20 @@ class DriftTaskCardService implements TaskCardService {
     required DatabaseProvider databaseProvider,
     required UserProfileRepository profiles,
     required List<TaskTemplate> templates,
+    int Function()? activeUserId,
   })  : _dbProvider = databaseProvider,
         _profiles = profiles,
-        _templates = templates;
+        _templates = templates,
+        _activeUserId = activeUserId ?? (() => 1);
 
   final DatabaseProvider _dbProvider;
   final UserProfileRepository _profiles;
   final List<TaskTemplate> _templates;
+  final int Function() _activeUserId;
 
   AppDatabase get _db => _dbProvider.db;
+
+  int get _uid => _activeUserId();
 
   static DateTime calendarDay(DateTime dt) =>
       DateTime(dt.year, dt.month, dt.day);
@@ -30,9 +35,10 @@ class DriftTaskCardService implements TaskCardService {
   @override
   Future<void> ensureTodayCards(DateTime today) async {
     final day = calendarDay(today);
+    final uid = _uid;
     final existing = await (_db.select(_db.taskCards)
           ..where(
-            (t) => t.userId.equals(1) & t.localDate.equals(day),
+            (t) => t.userId.equals(uid) & t.localDate.equals(day),
           ))
         .get();
     if (existing.isNotEmpty) return;
@@ -51,7 +57,7 @@ class DriftTaskCardService implements TaskCardService {
       });
       await _db.into(_db.taskCards).insert(
             TaskCardsCompanion.insert(
-              userId: 1,
+              userId: uid,
               localDate: day,
               stage: _stageWire(snapshot.stage),
               weekValue: Value(snapshot.weekValue),
@@ -66,8 +72,9 @@ class DriftTaskCardService implements TaskCardService {
   Future<List<TaskCardView>> listToday(DateTime today) async {
     final day = calendarDay(today);
     await ensureTodayCards(day);
+    final uid = _uid;
     final rows = await (_db.select(_db.taskCards)
-          ..where((t) => t.userId.equals(1) & t.localDate.equals(day))
+          ..where((t) => t.userId.equals(uid) & t.localDate.equals(day))
           ..orderBy([(t) => OrderingTerm.asc(t.id)]))
         .get();
     return rows.map(_toView).toList();

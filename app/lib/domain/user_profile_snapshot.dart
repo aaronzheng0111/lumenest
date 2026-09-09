@@ -1,11 +1,15 @@
 import 'stage.dart';
+import 'rich_user_profile.dart';
 
-/// Read model from 03. Home must not compute gestational week itself.
-class UserProfileSnapshot {
+/// Read model from 03 (+ rich profile for Home / Me / agent context).
+final class UserProfileSnapshot {
   const UserProfileSnapshot({
     required this.stage,
     this.weekValue,
     this.weekUnit,
+    this.userId = 1,
+    this.nickname = '妈妈',
+    this.rich = const RichUserProfile(),
   });
 
   final Stage stage;
@@ -14,11 +18,23 @@ class UserProfileSnapshot {
   /// `PREGNANCY_WEEK` | `POSTPARTUM_WEEK` | null
   final String? weekUnit;
 
+  final int userId;
+  final String nickname;
+  final RichUserProfile rich;
+
   static const UserProfileSnapshot fallback = UserProfileSnapshot(
     stage: Stage.prep,
   );
 
   String get stageLabel => stage.label;
+
+  String get displayName {
+    final full = rich.fullName?.trim();
+    if (full != null && full.isNotEmpty) return full;
+    return nickname;
+  }
+
+  int? get ageYears => rich.ageYears();
 
   /// AC-01-F01 week line.
   String get weekLabel {
@@ -38,4 +54,12 @@ class UserProfileSnapshot {
         return '产后第$w周';
     }
   }
+
+  /// Compact agent prompt line (sensitive medical kept abstract).
+  String get agentArchiveLine => rich.agentContextSummary(
+        nickname: nickname,
+        stageLabel: stageLabel,
+        weekValue: weekValue,
+        weekUnit: weekUnit,
+      );
 }

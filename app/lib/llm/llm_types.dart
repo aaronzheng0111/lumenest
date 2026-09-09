@@ -51,6 +51,25 @@ abstract final class LlmUserCopy {
   static const loading = '正在回复';
 }
 
+/// OpenAI-style stream event: zero or more text [LlmStreamDelta]s, then one [LlmStreamEnd].
+sealed class LlmStreamEvent {
+  const LlmStreamEvent();
+}
+
+/// Incremental token (or coalesced chunk) from a streaming completion.
+final class LlmStreamDelta extends LlmStreamEvent {
+  const LlmStreamDelta(this.text);
+
+  final String text;
+}
+
+/// Terminal event for a streaming completion (success or error).
+final class LlmStreamEnd extends LlmStreamEvent {
+  const LlmStreamEnd(this.result);
+
+  final LlmResult result;
+}
+
 abstract class LlmClient {
   /// When false, the agent graph uses [OfflineDefaultReply] instead of remote LLM.
   bool get canCallRemote => true;
@@ -59,4 +78,63 @@ abstract class LlmClient {
     required List<ChatMessageWire> messages,
     required String requestId,
   });
+
+  /// Streaming chat completion. Default: one-shot [complete], then one delta + end.
+  Stream<LlmStreamEvent> streamComplete({
+    required List<ChatMessageWire> messages,
+    required String requestId,
+  }) =>
+      oneShotLlmStream(this, messages: messages, requestId: requestId);
+}
+
+/// Default [LlmClient.streamComplete]: await [LlmClient.complete], emit one delta + end.
+Stream<LlmStreamEvent> oneShotLlmStream(
+  LlmClient client, {
+  required List<ChatMessageWire> messages,
+  required String requestId,
+}) async* {
+  final result = await client.complete(
+    messages: messages,
+    requestId: requestId,
+  );
+  if (result.isOk && (result.content?.isNotEmpty ?? false)) {
+    yield LlmStreamDelta(result.content!);
+  }
+  yield LlmStreamEnd(result);
+}
+
+/// Consumes [streamComplete] into a final [LlmResult], invoking [onPartial]
+/// with the accumulated assistant text after each delta.
+Future<LlmResult> collectLlmStream(
+  Stream<LlmStreamEvent> stream, {
+  void Function(String partial)? onPartial,
+}) async {
+  final buffer = StringBuffer();
+  LlmResult? ended;
+  await for (final event in stream) {
+    switch (event) {
+      case LlmStreamDelta(:final text):
+        if (text.isEmpty) continue;
+        buffer.write(text);
+        onPartial?.call(buffer.toString());
+      case LlmStreamEnd(:final result):
+        ended = result;
+    }
+  }
+  if (ended == null) {
+    return const LlmResult(status: LlmStatus.parseError);
+  }
+  if (ended.status == LlmStatus.ok &&
+      (ended.content == null || ended.content!.isEmpty) &&
+      buffer.isNotEmpty) {
+    return LlmResult(
+      status: LlmStatus.ok,
+      content: buffer.toString(),
+      promptTokens: ended.promptTokens,
+      completionTokens: ended.completionTokens,
+      httpStatus: ended.httpStatus,
+      latencyMs: ended.latencyMs,
+    );
+  }
+  return ended;
 }

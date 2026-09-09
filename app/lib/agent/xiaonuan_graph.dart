@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../context/context_slice.dart';
 import '../context/drift_context_slice.dart';
 import '../data/conversation_repository.dart';
+import '../data/user_profile_repository.dart';
 import '../domain/agent_role.dart';
 import '../knowledge/knowledge_retriever.dart';
 import '../llm/llm_types.dart';
@@ -10,6 +11,7 @@ import '../safety/safety_gate.dart';
 import 'offline_default_reply.dart';
 import 'tool_acl.dart';
 import 'tools/get_current_time_tool.dart';
+import 'tools/update_profile_tool.dart';
 
 class GraphTurnResult {
   const GraphTurnResult({
@@ -42,6 +44,7 @@ class XiaonuanGraph {
     LlmClient Function()? resolveLlm,
     ContextSlicer? slicer,
     SummaryWriter? summaryWriter,
+    this.profiles,
     this.userId = 1,
     this.speaker = AgentRole.xiaonuan,
     this.clock,
@@ -63,6 +66,7 @@ class XiaonuanGraph {
   final String systemPrompt;
   final ContextSlicer slicer;
   final SummaryWriter summaryWriter;
+  final UserProfileRepository? profiles;
   final int userId;
   final AgentRole speaker;
 
@@ -85,6 +89,7 @@ class XiaonuanGraph {
   Future<GraphTurnResult> handle({
     required int conversationId,
     required String userText,
+    void Function(AgentRole speaker, String partial)? onPartial,
   }) async {
     if (safety is LocalSafetyGate) {
       (safety as LocalSafetyGate).conversationId = '$conversationId';
@@ -109,6 +114,7 @@ class XiaonuanGraph {
     final sources = hits.map((h) => h.title).take(3).toList();
     final toolsUsed = <AgentTool>[];
     final timeResult = _maybeRunCurrentTime(userText, toolsUsed);
+    final profileResult = await _maybeUpdateProfile(userText, toolsUsed);
 
     final slice = await slicer.build(
       userId: userId,
@@ -126,6 +132,10 @@ class XiaonuanGraph {
     if (timeResult != null) {
       system = '$system\n【工具】${GetCurrentTimeTool.name}=$timeResult';
     }
+    if (profileResult != null) {
+      system =
+          '$system\n【工具】${UpdateProfileTool.name}=${profileResult.summary}';
+    }
 
     final String content;
     final int llmCalls;
@@ -140,6 +150,8 @@ class XiaonuanGraph {
         speaker: speaker,
         userText: userText,
         currentTime: timeResult,
+        profileUpdateSummary:
+            profileResult?.applied == true ? profileResult!.summary : null,
       );
       llmCalls = 0;
       usedOffline = true;
@@ -151,9 +163,14 @@ class XiaonuanGraph {
         ChatMessageWire(role: 'user', content: userText),
       ];
 
-      final result = await llm.complete(
-        messages: wireMessages,
-        requestId: _requestId(),
+      final result = await collectLlmStream(
+        llm.streamComplete(
+          messages: wireMessages,
+          requestId: _requestId(),
+        ),
+        onPartial: onPartial == null
+            ? null
+            : (partial) => onPartial(speaker, partial),
       );
 
       content = switch (result.status) {
@@ -162,6 +179,8 @@ class XiaonuanGraph {
             speaker: speaker,
             userText: userText,
             currentTime: timeResult,
+            profileUpdateSummary:
+                profileResult?.applied == true ? profileResult!.summary : null,
           ),
         _ => LlmUserCopy.retryLater,
       };
@@ -201,6 +220,24 @@ class XiaonuanGraph {
     if (!GetCurrentTimeTool.shouldInvoke(userText)) return null;
     toolsUsed.add(AgentTool.getCurrentTime);
     return GetCurrentTimeTool.invoke(now: clock?.call());
+  }
+
+  Future<ProfileToolResult?> _maybeUpdateProfile(
+    String userText,
+    List<AgentTool> toolsUsed,
+  ) async {
+    final repo = profiles;
+    if (repo == null) return null;
+    if (!ToolAcl.canUse(speaker, AgentTool.updateProfile)) return null;
+    if (!UpdateProfileTool.shouldInvoke(userText)) return null;
+    final result = await UpdateProfileTool.invoke(
+      profiles: repo,
+      userText: userText,
+      now: clock?.call(),
+    );
+    if (!result.applied) return null;
+    toolsUsed.add(AgentTool.updateProfile);
+    return result;
   }
 
   Future<List<KnowledgeHit>> _retrieveForRole(String userText) async {

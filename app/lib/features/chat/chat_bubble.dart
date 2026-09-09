@@ -15,6 +15,7 @@ class ChatBubble extends StatelessWidget {
     super.key,
     required this.message,
     this.animateReveal = false,
+    this.showActions = true,
     this.onDeleted,
     this.onCopied,
   });
@@ -23,6 +24,9 @@ class ChatBubble extends StatelessWidget {
 
   /// When true, assistant text types out once (new offline/remote replies).
   final bool animateReveal;
+
+  /// When false, hide copy/delete (e.g. in-flight stream draft).
+  final bool showActions;
 
   final VoidCallback? onDeleted;
   final VoidCallback? onCopied;
@@ -163,7 +167,7 @@ class ChatBubble extends StatelessWidget {
                 child: InkWell(
                   key: Key('chat_bubble_${message.id}'),
                   borderRadius: radius,
-                  onLongPress: () => _showActions(context),
+                  onLongPress: showActions ? () => _showActions(context) : null,
                   child: GlassContainer(
                     fill: fill,
                     borderRadius: radius,
@@ -186,30 +190,32 @@ class ChatBubble extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                key: Key('bubble_copy_${message.id}'),
-                tooltip: AppCopy.copyMessage,
-                visualDensity: VisualDensity.compact,
-                iconSize: 18,
-                color: AppColors.onSurfaceVariant,
-                onPressed: () => _copy(context),
-                icon: const Icon(Icons.copy_rounded),
-              ),
-              IconButton(
-                key: Key('bubble_delete_${message.id}'),
-                tooltip: AppCopy.deleteMessage,
-                visualDensity: VisualDensity.compact,
-                iconSize: 18,
-                color: AppColors.onSurfaceVariant,
-                onPressed: () => _confirmDelete(context),
-                icon: const Icon(Icons.delete_outline_rounded),
-              ),
-            ],
-          ),
+          if (showActions) ...[
+            const SizedBox(height: 2),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  key: Key('bubble_copy_${message.id}'),
+                  tooltip: AppCopy.copyMessage,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 18,
+                  color: AppColors.onSurfaceVariant,
+                  onPressed: () => _copy(context),
+                  icon: const Icon(Icons.copy_rounded),
+                ),
+                IconButton(
+                  key: Key('bubble_delete_${message.id}'),
+                  tooltip: AppCopy.deleteMessage,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 18,
+                  color: AppColors.onSurfaceVariant,
+                  onPressed: () => _confirmDelete(context),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+              ],
+            ),
+          ],
           if (message.sourceTitles.isNotEmpty) ...[
             const SizedBox(height: 2),
             Align(

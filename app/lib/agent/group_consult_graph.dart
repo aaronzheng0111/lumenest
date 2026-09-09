@@ -1,6 +1,7 @@
 import '../context/context_slice.dart';
 import '../data/conversation_repository.dart';
 import '../data/db/domain_enums.dart';
+import '../data/user_profile_repository.dart';
 import '../domain/agent_role.dart';
 import '../knowledge/knowledge_retriever.dart';
 import '../llm/llm_types.dart';
@@ -10,6 +11,7 @@ import 'offline_default_reply.dart';
 import 'role_prompts.dart';
 import 'tool_acl.dart';
 import 'tools/get_current_time_tool.dart';
+import 'tools/update_profile_tool.dart';
 import 'xiaonuan_graph.dart';
 
 /// GROUP turn: Safety → route → 1–2 LLM speakers → persist (AC-11-B04/B05).
@@ -28,6 +30,7 @@ class GroupConsultGraph {
     required this.routerRules,
     LlmClient? llm,
     LlmClient Function()? resolveLlm,
+    this.profiles,
     this.userId = 1,
     this.promptLoader = RolePrompts.load,
     this.clock,
@@ -47,6 +50,7 @@ class GroupConsultGraph {
   final ContextSlicer slicer;
   final SummaryWriter summaryWriter;
   final List<RouterRule> routerRules;
+  final UserProfileRepository? profiles;
   final int userId;
   final Future<String> Function(AgentRole role) promptLoader;
   final DateTime Function()? clock;
@@ -59,6 +63,8 @@ class GroupConsultGraph {
     required String userText,
     bool hasImage = false,
     int? riskScore,
+    void Function(AgentRole speaker, String partial)? onPartial,
+    Future<void> Function()? onSpeakerPersisted,
   }) async {
     if (safety is LocalSafetyGate) {
       (safety as LocalSafetyGate).conversationId = '$conversationId';
@@ -90,13 +96,23 @@ class GroupConsultGraph {
     );
     final speakers = route.speakers;
 
+    final toolsUsed = <AgentTool>[];
+    final timeResult = _maybeRunCurrentTime(
+      speakers.isEmpty ? AgentRole.xiaonuan : speakers.first,
+      userText,
+      toolsUsed,
+    );
+    final profileResult = await _maybeUpdateProfile(
+      speakers.isEmpty ? AgentRole.xiaonuan : speakers.first,
+      userText,
+      toolsUsed,
+    );
+
     final slice = await slicer.build(
       userId: userId,
       conversationId: conversationId,
     );
 
-    // Same shape as XiaonuanGraph: prior turns, then this user utterance once.
-    // Each completed speaker appends a labeled assistant turn for the next call.
     final transcript = <ChatMessageWire>[
       ...slice.recentTurns,
       ChatMessageWire(role: 'user', content: userText),
@@ -106,13 +122,7 @@ class GroupConsultGraph {
     String? lastContent;
     int? lastId;
     final allSources = <String>[];
-    final toolsUsed = <AgentTool>[];
     var usedOffline = false;
-    final timeResult = _maybeRunCurrentTime(
-      speakers.isEmpty ? AgentRole.xiaonuan : speakers.first,
-      userText,
-      toolsUsed,
-    );
     final speakerList = speakers.take(2).toList();
 
     for (final speaker in speakerList) {
@@ -141,6 +151,10 @@ class GroupConsultGraph {
       if (timeResult != null) {
         system = '$system\n【工具】${GetCurrentTimeTool.name}=$timeResult';
       }
+      if (profileResult != null) {
+        system =
+            '$system\n【工具】${UpdateProfileTool.name}=${profileResult.summary}';
+      }
 
       final String content;
       final bool writeSummary;
@@ -153,17 +167,24 @@ class GroupConsultGraph {
           speaker: speaker,
           userText: userText,
           currentTime: timeResult,
+          profileUpdateSummary:
+              profileResult?.applied == true ? profileResult!.summary : null,
         );
         usedOffline = true;
         writeSummary = false;
       } else {
-        final result = await llm.complete(
-          messages: [
-            ChatMessageWire(role: 'system', content: system),
-            ...transcript,
-          ],
-          requestId:
-              'grp-${speaker.wireId}-${DateTime.now().microsecondsSinceEpoch}',
+        final result = await collectLlmStream(
+          llm.streamComplete(
+            messages: [
+              ChatMessageWire(role: 'system', content: system),
+              ...transcript,
+            ],
+            requestId:
+                'grp-${speaker.wireId}-${DateTime.now().microsecondsSinceEpoch}',
+          ),
+          onPartial: onPartial == null
+              ? null
+              : (partial) => onPartial(speaker, partial),
         );
         llmCalls++;
 
@@ -173,6 +194,9 @@ class GroupConsultGraph {
               speaker: speaker,
               userText: userText,
               currentTime: timeResult,
+              profileUpdateSummary: profileResult?.applied == true
+                  ? profileResult!.summary
+                  : null,
             ),
           _ => LlmUserCopy.retryLater,
         };
@@ -192,7 +216,10 @@ class GroupConsultGraph {
         agentReplyRef: handoffRef,
       );
 
-      // Feed the next shared-model call the full reply (xiaonuan-style transcript).
+      if (onSpeakerPersisted != null) {
+        await onSpeakerPersisted();
+      }
+
       transcript.add(
         ChatMessageWire(
           role: 'assistant',
@@ -229,6 +256,25 @@ class GroupConsultGraph {
     if (!GetCurrentTimeTool.shouldInvoke(userText)) return null;
     toolsUsed.add(AgentTool.getCurrentTime);
     return GetCurrentTimeTool.invoke(now: clock?.call());
+  }
+
+  Future<ProfileToolResult?> _maybeUpdateProfile(
+    AgentRole speaker,
+    String userText,
+    List<AgentTool> toolsUsed,
+  ) async {
+    final repo = profiles;
+    if (repo == null) return null;
+    if (!ToolAcl.canUse(speaker, AgentTool.updateProfile)) return null;
+    if (!UpdateProfileTool.shouldInvoke(userText)) return null;
+    final result = await UpdateProfileTool.invoke(
+      profiles: repo,
+      userText: userText,
+      now: clock?.call(),
+    );
+    if (!result.applied) return null;
+    toolsUsed.add(AgentTool.updateProfile);
+    return result;
   }
 
   Future<List<KnowledgeHit>> _retrieveForRole(

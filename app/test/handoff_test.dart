@@ -183,7 +183,7 @@ void main() {
   });
 }
 
-class _CountingLlm implements LlmClient {
+class _CountingLlm extends LlmClient {
   int calls = 0;
   final List<List<ChatMessageWire>> callMessages = [];
 
@@ -201,7 +201,7 @@ class _CountingLlm implements LlmClient {
   }
 }
 
-class _ScriptedIntentLlm implements LlmClient {
+class _ScriptedIntentLlm extends LlmClient {
   _ScriptedIntentLlm(this.label);
   final String label;
   int calls = 0;

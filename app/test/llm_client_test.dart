@@ -186,6 +186,55 @@ void main() {
     expect(fixture['temperature'], 0.7);
     expect(fixture['messages'], isA<List>());
   });
+
+  test('parseOpenAiSse yields deltas and stops on [DONE]', () async {
+    final bytes = utf8.encode(
+      'data: {"choices":[{"delta":{"content":"你"}}]}\n'
+      'data: {"choices":[{"delta":{"content":"好"}}]}\n'
+      'data: [DONE]\n'
+      'data: {"choices":[{"delta":{"content":"忽略"}}]}\n',
+    );
+    final deltas = await parseOpenAiSse(Stream.value(bytes))
+        .map((e) => e.text)
+        .toList();
+    expect(deltas, ['你', '好']);
+  });
+
+  test('streamComplete posts stream:true and yields tokens', () async {
+    final sse = utf8.encode(
+      'data: {"choices":[{"delta":{"content":"多"}}]}\n'
+      'data: {"choices":[{"delta":{"content":"喝水"}}]}\n'
+      'data: [DONE]\n',
+    );
+    final adapter = _ScriptedAdapter([
+      _ScriptedResponse(
+        statusCode: 200,
+        body: const {},
+        sseBytes: sse,
+      ),
+    ]);
+    final client = DioLlmClient(
+      config: const LlmConfig(
+        baseUrl: 'https://example.com/v1',
+        apiKey: 'test-key',
+        model: 'gpt-4o-mini',
+      ),
+      dio: Dio()..httpClientAdapter = adapter,
+    );
+    final partials = <String>[];
+    final result = await collectLlmStream(
+      client.streamComplete(
+        messages: const [ChatMessageWire(role: 'user', content: '累')],
+        requestId: 'req-stream',
+      ),
+      onPartial: partials.add,
+    );
+    expect(adapter.lastBody?['stream'], isTrue);
+    expect(result.status, LlmStatus.ok);
+    expect(result.content, '多喝水');
+    expect(partials, ['多', '多喝水']);
+    expect(client.requestCount, 1);
+  });
 }
 
 class _ScriptedResponse {
@@ -193,6 +242,7 @@ class _ScriptedResponse {
     required this.statusCode,
     required this.body,
     this.timeout = false,
+    this.sseBytes,
   });
 
   factory _ScriptedResponse.timeout() =>
@@ -201,6 +251,7 @@ class _ScriptedResponse {
   final int statusCode;
   final Map<String, dynamic> body;
   final bool timeout;
+  final List<int>? sseBytes;
 }
 
 class _ScriptedAdapter implements HttpClientAdapter {
@@ -208,6 +259,7 @@ class _ScriptedAdapter implements HttpClientAdapter {
 
   final List<_ScriptedResponse> responses;
   int calls = 0;
+  Map<String, dynamic>? lastBody;
 
   @override
   void close({bool force = false}) {}
@@ -222,10 +274,25 @@ class _ScriptedAdapter implements HttpClientAdapter {
     final scripted = responses[calls - 1];
     expect(options.headers.containsKey('Authorization'), isTrue);
     expect(options.headers['x-request-id'], isNotNull);
+    final data = options.data;
+    if (data is Map<String, dynamic>) {
+      lastBody = data;
+    } else if (data is Map) {
+      lastBody = Map<String, dynamic>.from(data);
+    }
     if (scripted.timeout) {
       throw DioException(
         requestOptions: options,
         type: DioExceptionType.receiveTimeout,
+      );
+    }
+    if (scripted.sseBytes != null) {
+      return ResponseBody.fromBytes(
+        scripted.sseBytes!,
+        scripted.statusCode,
+        headers: {
+          Headers.contentTypeHeader: ['text/event-stream'],
+        },
       );
     }
     final bytes = utf8.encode(jsonEncode(scripted.body));

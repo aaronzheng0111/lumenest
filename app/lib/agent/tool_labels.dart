@@ -11,5 +11,6 @@ abstract final class AgentToolLabels {
         AgentTool.upsertHabit => '更新习惯',
         AgentTool.toggleTask => '切换任务',
         AgentTool.getCurrentTime => '获取当前时间',
+        AgentTool.updateProfile => '更新档案',
       };
 }

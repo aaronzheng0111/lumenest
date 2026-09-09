@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_mom_baby/agent/xiaonuan_graph.dart';
 import 'package:ai_mom_baby/context/context_slice.dart';
 import 'package:ai_mom_baby/context/drift_context_slice.dart';
+import 'package:ai_mom_baby/data/active_user_store.dart';
 import 'package:ai_mom_baby/data/db/database_provider.dart';
 import 'package:ai_mom_baby/data/db/domain_enums.dart';
 import 'package:ai_mom_baby/data/drift_conversation_repository.dart';
@@ -55,7 +56,7 @@ void main() {
     await db.init();
     addTearDown(db.close);
     final repo = DriftConversationRepository(db);
-    final profiles = DriftUserProfileRepository(db);
+    final profiles = DriftUserProfileRepository(db, activeUserStore: MemoryActiveUserStore());
     final slicer = DriftContextSlicer(
       databaseProvider: db,
       profiles: profiles,
@@ -82,7 +83,7 @@ void main() {
     await db.init();
     addTearDown(db.close);
     final repo = DriftConversationRepository(db);
-    final profiles = DriftUserProfileRepository(db);
+    final profiles = DriftUserProfileRepository(db, activeUserStore: MemoryActiveUserStore());
     final slicer = DriftContextSlicer(
       databaseProvider: db,
       profiles: profiles,
@@ -113,7 +114,7 @@ void main() {
     await db.init();
     addTearDown(db.close);
     final repo = DriftConversationRepository(db);
-    final profiles = DriftUserProfileRepository(db);
+    final profiles = DriftUserProfileRepository(db, activeUserStore: MemoryActiveUserStore());
     final llm = _CountingLlm(reply: '先歇一歇吧。');
     final writer = DriftSummaryWriter(
       databaseProvider: db,
@@ -156,7 +157,7 @@ void main() {
     await db.init();
     addTearDown(db.close);
     final repo = DriftConversationRepository(db);
-    final profiles = DriftUserProfileRepository(db);
+    final profiles = DriftUserProfileRepository(db, activeUserStore: MemoryActiveUserStore());
     final writer = DriftSummaryWriter(
       databaseProvider: db,
       profiles: profiles,
@@ -177,7 +178,7 @@ void main() {
   });
 }
 
-class _CountingLlm implements LlmClient {
+class _CountingLlm extends LlmClient {
   _CountingLlm({this.reply = 'ok'});
   final String reply;
   int calls = 0;
@@ -197,7 +198,7 @@ class _CountingLlm implements LlmClient {
   }
 }
 
-class _FailLlm implements LlmClient {
+class _FailLlm extends LlmClient {
   @override
   bool get canCallRemote => true;
 

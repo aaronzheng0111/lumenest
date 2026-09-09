@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_mom_baby/app_copy.dart';
+import 'package:ai_mom_baby/data/active_user_store.dart';
 import 'package:ai_mom_baby/data/db/database_provider.dart';
 import 'package:ai_mom_baby/data/drift_user_profile_repository.dart';
 import 'package:ai_mom_baby/domain/stage.dart';
@@ -51,7 +52,7 @@ void main() {
     addTearDown(db.close);
     final service = DriftTaskCardService(
       databaseProvider: db,
-      profiles: DriftUserProfileRepository(db),
+      profiles: DriftUserProfileRepository(db, activeUserStore: MemoryActiveUserStore()),
       templates: templates,
     );
     final day = DateTime(2026, 9, 9);
@@ -70,7 +71,7 @@ void main() {
     addTearDown(db.close);
     final service = DriftTaskCardService(
       databaseProvider: db,
-      profiles: DriftUserProfileRepository(db),
+      profiles: DriftUserProfileRepository(db, activeUserStore: MemoryActiveUserStore()),
       templates: templates,
     );
     final day = DateTime(2026, 9, 9);

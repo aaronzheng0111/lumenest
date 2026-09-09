@@ -7,6 +7,7 @@ import 'agent/xiaonuan_graph.dart';
 import 'agent/role_prompts.dart';
 import 'context/context_slice.dart';
 import 'context/drift_context_slice.dart';
+import 'data/active_user_store.dart';
 import 'data/conversation_repository.dart';
 import 'data/db/database_provider.dart';
 import 'data/drift_conversation_repository.dart';
@@ -38,12 +39,81 @@ final databaseReadyProvider = FutureProvider<void>((ref) async {
 });
 
 final userProfileRepositoryProvider = Provider<UserProfileRepository>((ref) {
-  return DriftUserProfileRepository(ref.watch(databaseProvider));
+  return DriftUserProfileRepository(
+    ref.watch(databaseProvider),
+    activeUserStore: ref.watch(activeUserStoreProvider),
+  );
 });
+
+final activeUserStoreProvider = Provider<ActiveUserStore>((ref) {
+  return SharedPrefsActiveUserStore();
+});
+
+/// Cached active user id; bump via [ActiveUserController.switchTo] / create.
+final activeUserIdProvider =
+    StateNotifierProvider<ActiveUserController, AsyncValue<int>>((ref) {
+  return ActiveUserController(
+    ref,
+    store: ref.watch(activeUserStoreProvider),
+    profiles: ref.watch(userProfileRepositoryProvider),
+  );
+});
+
+/// Owns active-account switches and invalidates user-scoped providers.
+class ActiveUserController extends StateNotifier<AsyncValue<int>> {
+  ActiveUserController(
+    this._ref, {
+    required ActiveUserStore store,
+    required UserProfileRepository profiles,
+  })  : _store = store,
+        _profiles = profiles,
+        super(const AsyncLoading()) {
+    _hydrate();
+  }
+
+  final Ref _ref;
+  final ActiveUserStore _store;
+  final UserProfileRepository _profiles;
+
+  Future<void> _hydrate() async {
+    try {
+      final id = await _store.getActiveUserId();
+      if (!mounted) return;
+      state = AsyncData(id);
+    } catch (e, st) {
+      if (!mounted) return;
+      state = AsyncError(e, st);
+    }
+  }
+
+  void _invalidateUserScoped() {
+    // Snapshot / accounts already watch [activeUserIdProvider]; refresh chats
+    // and today cards that close over the previous user id.
+    _ref.invalidate(conversationListProvider);
+    _ref.invalidate(todayTaskCardsProvider);
+  }
+
+  Future<void> switchTo(int userId) async {
+    await _profiles.switchAccount(userId);
+    if (!mounted) return;
+    state = AsyncData(userId);
+    _invalidateUserScoped();
+  }
+
+  Future<int> createAccount({String nickname = '妈妈'}) async {
+    final id = await _profiles.createAccount(nickname: nickname);
+    if (!mounted) return id;
+    state = AsyncData(id);
+    _invalidateUserScoped();
+    return id;
+  }
+}
 
 /// Cold-start snapshot. Failures map to PREP without crashing.
 final userProfileSnapshotProvider =
     FutureProvider<UserProfileSnapshot>((ref) async {
+  // Re-read when active user changes.
+  ref.watch(activeUserIdProvider);
   final repo = ref.watch(userProfileRepositoryProvider);
   try {
     return await repo.getSnapshot();
@@ -51,6 +121,11 @@ final userProfileSnapshotProvider =
     debugPrint('UserProfileRepository.getSnapshot failed: $e');
     return UserProfileSnapshot.fallback;
   }
+});
+
+final localAccountsProvider = FutureProvider<List<LocalAccount>>((ref) async {
+  ref.watch(activeUserIdProvider);
+  return ref.watch(userProfileRepositoryProvider).listAccounts();
 });
 
 final privacyStoreProvider = Provider<PrivacyStore>(
@@ -181,7 +256,12 @@ final llmClientProvider = Provider<LlmClient>((ref) {
 });
 
 final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  return DriftConversationRepository(ref.watch(databaseProvider));
+  ref.watch(activeUserIdProvider);
+  return DriftConversationRepository(
+    ref.watch(databaseProvider),
+    activeUserId: () =>
+        ref.read(activeUserIdProvider).valueOrNull ?? 1,
+  );
 });
 
 final conversationListProvider =
@@ -262,6 +342,8 @@ final agentGraphProvider =
     systemPrompt: prompt,
     slicer: ref.watch(contextSlicerProvider),
     summaryWriter: ref.watch(summaryWriterProvider),
+    profiles: ref.watch(userProfileRepositoryProvider),
+    userId: ref.watch(activeUserIdProvider).valueOrNull ?? 1,
     speaker: role,
   );
 });
@@ -310,15 +392,20 @@ final groupConsultGraphProvider = FutureProvider<GroupConsultGraph>((ref) async 
     slicer: ref.watch(contextSlicerProvider),
     summaryWriter: ref.watch(summaryWriterProvider),
     routerRules: rules,
+    profiles: ref.watch(userProfileRepositoryProvider),
+    userId: ref.watch(activeUserIdProvider).valueOrNull ?? 1,
   );
 });
 
 final taskCardServiceProvider = FutureProvider<TaskCardService>((ref) async {
   final templates = await loadTaskTemplates();
+  ref.watch(activeUserIdProvider);
   return DriftTaskCardService(
     databaseProvider: ref.watch(databaseProvider),
     profiles: ref.watch(userProfileRepositoryProvider),
     templates: templates,
+    activeUserId: () =>
+        ref.read(activeUserIdProvider).valueOrNull ?? 1,
   );
 });
 

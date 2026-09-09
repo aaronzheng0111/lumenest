@@ -128,10 +128,8 @@ String buildPromptBlock({
   required String habitsText,
   required String summariesText,
 }) {
-  final week = snapshot.weekValue;
-  final unit = snapshot.weekUnit ?? '';
-  final weekPart = week == null ? '' : '$week$unit';
-  return '【档案】阶段=${snapshot.stageLabel} 周次=$weekPart\n'
+  final archive = snapshot.agentArchiveLine;
+  return '【档案】$archive\n'
       '【习惯】$habitsText\n'
       '【近期摘要】$summariesText';
 }
@@ -195,7 +193,7 @@ class EmptyContextSlicer implements ContextSlicer {
     required int conversationId,
   }) async {
     return const ContextSlice(
-      promptBlock: '【档案】阶段=备孕 周次=\n【习惯】无\n【近期摘要】无',
+      promptBlock: '【档案】昵称=妈妈；阶段=备孕\n【习惯】无\n【近期摘要】无',
       recentTurns: [],
     );
   }

@@ -1,6 +1,8 @@
+import '../domain/rich_user_profile.dart';
 import '../domain/user_profile_snapshot.dart';
 
-class ProfileEdits {
+/// Partial update for stage columns on the `users` row.
+final class ProfileEdits {
   const ProfileEdits({
     this.nickname,
     this.lastMenstruationDate,
@@ -20,8 +22,8 @@ class ProfileEdits {
   final bool clearBirthDate;
 }
 
-/// Editable fields shown on the Me profile form (no Drift types).
-class ProfileDraft {
+/// Editable stage fields shown on the pregnancy stage form (no Drift types).
+final class ProfileDraft {
   const ProfileDraft({
     required this.nickname,
     this.lastMenstruationDate,
@@ -35,8 +37,21 @@ class ProfileDraft {
   final DateTime? birthDate;
 }
 
+/// Local account row for the account switcher.
+final class LocalAccount {
+  const LocalAccount({
+    required this.id,
+    required this.nickname,
+    required this.isActive,
+  });
+
+  final int id;
+  final String nickname;
+  final bool isActive;
+}
+
 /// Thrown when [UserProfileRepository.saveEdits] rejects input (AC-03-F03).
-class ProfileValidationException implements Exception {
+final class ProfileValidationException implements Exception {
   ProfileValidationException(this.message);
   final String message;
 
@@ -44,10 +59,33 @@ class ProfileValidationException implements Exception {
   String toString() => message;
 }
 
+/// Single SSOT for stage dates + rich profile. UI and agent tools both use this.
 abstract class UserProfileRepository {
+  Future<int> getActiveUserId();
+
+  Future<List<LocalAccount>> listAccounts();
+
+  /// Creates a new local user and optionally switches to it.
+  Future<int> createAccount({
+    String nickname = '妈妈',
+    bool switchTo = true,
+  });
+
+  Future<void> switchAccount(int userId);
+
   Future<UserProfileSnapshot> getSnapshot({DateTime? today});
 
   Future<ProfileDraft> loadDraft();
 
   Future<void> saveEdits(ProfileEdits edits, {DateTime? today});
+
+  Future<RichUserProfile> loadRichProfile();
+
+  /// Replaces the rich profile blob for the active user (manual UI save).
+  Future<void> saveRichProfile(RichUserProfile profile);
+
+  /// Merges a patched rich profile (agent tool + section editors).
+  Future<RichUserProfile> updateRichProfile(
+    RichUserProfile Function(RichUserProfile current) transform,
+  );
 }

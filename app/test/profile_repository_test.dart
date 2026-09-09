@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_mom_baby/app_copy.dart';
+import 'package:ai_mom_baby/data/active_user_store.dart';
 import 'package:ai_mom_baby/data/db/database_provider.dart';
 import 'package:ai_mom_baby/data/drift_user_profile_repository.dart';
 import 'package:ai_mom_baby/data/user_profile_repository.dart';
@@ -14,7 +15,7 @@ void main() {
   setUp(() async {
     dbProvider = DriftDatabaseProvider(executor: NativeDatabase.memory());
     await dbProvider.init();
-    repo = DriftUserProfileRepository(dbProvider);
+    repo = DriftUserProfileRepository(dbProvider, activeUserStore: MemoryActiveUserStore());
   });
 
   tearDown(() async {

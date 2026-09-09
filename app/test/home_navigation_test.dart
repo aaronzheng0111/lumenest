@@ -159,6 +159,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('我的'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('me_privacy')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text(AppCopy.privacyTitle), findsOneWidget);
     expect(find.text(AppCopy.exportData), findsOneWidget);
     expect(find.text(AppCopy.deleteData), findsOneWidget);
@@ -203,6 +209,12 @@ void main() {
     await _pumpApp(tester, privacy: privacy);
     await tester.tap(find.byKey(const Key('nav_me')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('me_privacy')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('me_privacy')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('privacy_sheet_title')), findsOneWidget);
@@ -239,6 +251,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('nav_me')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('me_export')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('me_export')));
     await tester.pumpAndSettle();
     expect(exported, [AppCopy.emptyExportJson]);
@@ -249,6 +267,12 @@ void main() {
     final privacy = MemoryPrivacyStore(accepted: true);
     await _pumpApp(tester, privacy: privacy);
     await tester.tap(find.byKey(const Key('nav_me')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('me_delete')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('me_delete')));
     await tester.pumpAndSettle();
@@ -353,5 +377,18 @@ void main() {
     await tester.tap(find.byKey(const Key('group_consult_btn')));
     await tester.pumpAndSettle();
     expect(find.text(AppCopy.groupConsultNeedsUpgrade), findsOneWidget);
+  });
+
+  testWidgets('profile sections are reachable from Me tab', (tester) async {
+    await _pumpApp(tester);
+    await tester.tap(find.byKey(const Key('nav_me')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('profile_hero_name')), findsOneWidget);
+    expect(find.byKey(const Key('profile_section_personal')), findsOneWidget);
+    expect(find.byKey(const Key('profile_section_health')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('profile_section_personal')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('personal_nickname')), findsOneWidget);
+    expect(find.byKey(const Key('profile_section_save')), findsOneWidget);
   });
 }

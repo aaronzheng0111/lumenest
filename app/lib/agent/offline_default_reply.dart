@@ -6,8 +6,14 @@ abstract final class OfflineDefaultReply {
     required AgentRole speaker,
     required String userText,
     String? currentTime,
+    String? profileUpdateSummary,
   }) {
     final name = speaker.displayName;
+    if (profileUpdateSummary != null && profileUpdateSummary.isNotEmpty) {
+      return '我是$name。已帮你更新档案：$profileUpdateSummary。'
+          '也可以随时在「我的」里手动修改同一份资料。'
+          '这是未配置模型密钥时的演示回复。';
+    }
     if (currentTime != null && currentTime.isNotEmpty) {
       return '我是$name。刚用本地工具查了一下，现在是 $currentTime。'
           '这是未配置模型密钥时的演示回复；配上密钥后我还能陪你细聊。';

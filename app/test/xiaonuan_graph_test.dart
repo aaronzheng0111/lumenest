@@ -97,7 +97,7 @@ void main() {
   });
 }
 
-class _CountingLlm implements LlmClient {
+class _CountingLlm extends LlmClient {
   _CountingLlm({this.reply = 'ok'});
 
   final String reply;

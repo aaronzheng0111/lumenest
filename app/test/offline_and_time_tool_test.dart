@@ -129,7 +129,7 @@ void main() {
   });
 }
 
-class _OfflineLlm implements LlmClient {
+class _OfflineLlm extends LlmClient {
   int calls = 0;
 
   @override
@@ -145,7 +145,7 @@ class _OfflineLlm implements LlmClient {
   }
 }
 
-class _CountingLlm implements LlmClient {
+class _CountingLlm extends LlmClient {
   int calls = 0;
   List<ChatMessageWire>? lastMessages;
 

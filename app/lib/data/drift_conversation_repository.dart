@@ -9,19 +9,26 @@ import 'db/database_provider.dart';
 import 'db/domain_enums.dart';
 
 class DriftConversationRepository implements ConversationRepository {
-  DriftConversationRepository(this._databaseProvider);
+  DriftConversationRepository(
+    this._databaseProvider, {
+    int Function()? activeUserId,
+  }) : _activeUserId = activeUserId ?? (() => 1);
 
   final DatabaseProvider _databaseProvider;
+  final int Function() _activeUserId;
 
   AppDatabase get _db => _databaseProvider.db;
+
+  int get _uid => _activeUserId();
 
   @override
   Future<int> getOrCreateSolo({required AgentRole role}) async {
     final wire = role.wireId;
+    final uid = _uid;
     final existing = await (_db.select(_db.conversations)
           ..where(
             (c) =>
-                c.userId.equals(1) &
+                c.userId.equals(uid) &
                 c.role.equals(wire) &
                 c.type.equals(ConversationTypeWire.solo),
           ))
@@ -31,7 +38,7 @@ class DriftConversationRepository implements ConversationRepository {
     }
     return _db.into(_db.conversations).insert(
           ConversationsCompanion.insert(
-            userId: 1,
+            userId: uid,
             role: wire,
             type: ConversationTypeWire.solo,
             createdAt: DateTime.now().toUtc(),
@@ -41,10 +48,11 @@ class DriftConversationRepository implements ConversationRepository {
 
   @override
   Future<int> getOrCreateGroup() async {
+    final uid = _uid;
     final existing = await (_db.select(_db.conversations)
           ..where(
             (c) =>
-                c.userId.equals(1) &
+                c.userId.equals(uid) &
                 c.type.equals(ConversationTypeWire.group),
           ))
         .get();
@@ -53,7 +61,7 @@ class DriftConversationRepository implements ConversationRepository {
     }
     return _db.into(_db.conversations).insert(
           ConversationsCompanion.insert(
-            userId: 1,
+            userId: uid,
             role: AgentRoleWire.xiaonuan,
             type: ConversationTypeWire.group,
             createdAt: DateTime.now().toUtc(),
@@ -117,8 +125,9 @@ class DriftConversationRepository implements ConversationRepository {
 
   @override
   Future<List<ConversationListItem>> listConversations() async {
+    final uid = _uid;
     final conversations = await (_db.select(_db.conversations)
-          ..where((c) => c.userId.equals(1)))
+          ..where((c) => c.userId.equals(uid)))
         .get();
     final items = <ConversationListItem>[];
     for (final c in conversations) {
@@ -155,7 +164,15 @@ class DriftConversationRepository implements ConversationRepository {
 
   @override
   Future<void> clearAllMessages() async {
-    await _db.delete(_db.messages).go();
+    final uid = _uid;
+    final convos = await (_db.select(_db.conversations)
+          ..where((c) => c.userId.equals(uid)))
+        .get();
+    for (final c in convos) {
+      await (_db.delete(_db.messages)
+            ..where((m) => m.conversationId.equals(c.id)))
+          .go();
+    }
   }
 
   @override
