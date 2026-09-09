@@ -63,30 +63,32 @@ class GroupConsultGraph {
     if (safety is LocalSafetyGate) {
       (safety as LocalSafetyGate).conversationId = '$conversationId';
     }
-    final decision = safety.inspect(userText);
-    if (decision.block) {
+    final safetyDecision = safety.inspect(userText);
+    if (safetyDecision.block) {
       final id = await messages.insertAssistantMessage(
         conversationId: conversationId,
-        content: decision.reply ?? '',
+        content: safetyDecision.reply ?? '',
         speaker: AgentRole.xiaonuan,
         safetyBadge: true,
       );
       return GraphTurnResult(
-        assistantContent: decision.reply ?? '',
+        assistantContent: safetyDecision.reply ?? '',
         blockedBySafety: true,
         llmCalls: 0,
         assistantMessageId: id,
       );
     }
 
-    final speakers = resolveSpeakers(
+    final route = await resolveSpeakersAsync(
       type: ConversationTypeWire.group,
       soloRole: AgentRole.xiaonuan,
       userText: userText,
       hasImage: hasImage,
       riskScore: riskScore,
       routerRules: routerRules,
+      intentLlm: llm,
     );
+    final speakers = route.speakers;
 
     final slice = await slicer.build(
       userId: userId,

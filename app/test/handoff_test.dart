@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_mom_baby/agent/group_consult_graph.dart';
+import 'package:ai_mom_baby/agent/group_intent_router.dart';
 import 'package:ai_mom_baby/agent/next_speaker.dart';
 import 'package:ai_mom_baby/context/drift_context_slice.dart';
 import 'package:ai_mom_baby/data/db/database_provider.dart';
@@ -43,8 +44,8 @@ void main() {
     }
   });
 
-  test('resolveSpeakers caps at 2 and supports 小暖→苏心', () {
-    final dual = resolveSpeakers(
+  test('resolveSpeakers consult handoff and soft emotion', () {
+    final consult = resolveSpeakers(
       type: ConversationTypeWire.group,
       soloRole: AgentRole.xiaonuan,
       userText: '今天有点焦虑睡不好',
@@ -52,8 +53,8 @@ void main() {
       riskScore: 0,
       routerRules: rules,
     );
-    // "焦虑" hits router → SUXIN alone.
-    expect(dual, [AgentRole.suxin]);
+    // Keyword → specialist, then 小暖 + 专科会诊分配.
+    expect(consult, [AgentRole.xiaonuan, AgentRole.suxin]);
 
     final soft = resolveSpeakers(
       type: ConversationTypeWire.group,
@@ -64,6 +65,49 @@ void main() {
       routerRules: const [],
     );
     expect(soft, [AgentRole.xiaonuan, AgentRole.suxin]);
+
+    final medical = resolveSpeakers(
+      type: ConversationTypeWire.group,
+      soloRole: AgentRole.xiaonuan,
+      userText: '产检要注意什么',
+      hasImage: false,
+      riskScore: 0,
+      routerRules: rules,
+    );
+    expect(medical, [AgentRole.xiaonuan, AgentRole.lin]);
+
+    final mention = resolveSpeakers(
+      type: ConversationTypeWire.group,
+      soloRole: AgentRole.xiaonuan,
+      userText: '@林医生 胎盘低置要紧吗',
+      hasImage: false,
+      riskScore: 0,
+      routerRules: rules,
+    );
+    expect(mention, [AgentRole.lin]);
+  });
+
+  test('GroupIntentRouter parseRoleLabel', () {
+    expect(GroupIntentRouter.parseRoleLabel('LIN'), AgentRole.lin);
+    expect(GroupIntentRouter.parseRoleLabel('角色：SUXIN'), AgentRole.suxin);
+    expect(GroupIntentRouter.parseRoleLabel('ama'), AgentRole.ama);
+    expect(GroupIntentRouter.parseRoleLabel('nonsense'), AgentRole.xiaonuan);
+  });
+
+  test('resolveSpeakersAsync uses LLM intent when rules miss', () async {
+    final llm = _ScriptedIntentLlm('LIN');
+    final decision = await resolveSpeakersAsync(
+      type: ConversationTypeWire.group,
+      soloRole: AgentRole.xiaonuan,
+      userText: '肚子不舒服怎么回事',
+      hasImage: false,
+      riskScore: 0,
+      routerRules: const [],
+      intentLlm: llm,
+    );
+    expect(decision.usedLlmIntent, isTrue);
+    expect(decision.speakers, [AgentRole.xiaonuan, AgentRole.lin]);
+    expect(llm.calls, 1);
   });
 
   test('T11-06 group graph ≤2 LLM and speakers differ', () async {
@@ -94,7 +138,7 @@ void main() {
     expect(llm.callMessages.length, 2);
     final second = llm.callMessages[1];
     expect(second.first.role, 'system');
-    expect(second.first.content, contains('【会诊】'));
+    expect(second.first.content, contains('【会诊身份】'));
     expect(second.first.content, contains('苏心'));
     expect(
       second.map((m) => '${m.role}:${m.content}').toList(),
@@ -154,6 +198,24 @@ class _CountingLlm implements LlmClient {
     calls++;
     callMessages.add(List.of(messages));
     return LlmResult(status: LlmStatus.ok, content: '回复$calls');
+  }
+}
+
+class _ScriptedIntentLlm implements LlmClient {
+  _ScriptedIntentLlm(this.label);
+  final String label;
+  int calls = 0;
+
+  @override
+  bool get canCallRemote => true;
+
+  @override
+  Future<LlmResult> complete({
+    required List<ChatMessageWire> messages,
+    required String requestId,
+  }) async {
+    calls++;
+    return LlmResult(status: LlmStatus.ok, content: label);
   }
 }
 
