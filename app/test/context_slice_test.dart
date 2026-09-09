@@ -74,7 +74,38 @@ void main() {
     final slice = await slicer.build(userId: 1, conversationId: cid);
     expect(slice.recentTurns.length, 20);
     expect(slice.recentTurns.any((m) => m.content == 'current'), isFalse);
-    expect(slice.recentTurns.last.content, 'a24');
+    expect(slice.recentTurns.last.content, '小暖：a24');
+  });
+
+  test('group recent turns label each speaker for shared-model history', () async {
+    final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+    await db.init();
+    addTearDown(db.close);
+    final repo = DriftConversationRepository(db);
+    final profiles = DriftUserProfileRepository(db);
+    final slicer = DriftContextSlicer(
+      databaseProvider: db,
+      profiles: profiles,
+      messages: repo,
+    );
+    final cid = await repo.getOrCreateGroup();
+    await repo.insertUserMessage(conversationId: cid, content: '问一下');
+    await repo.insertAssistantMessage(
+      conversationId: cid,
+      content: '先抱抱',
+      speaker: AgentRole.xiaonuan,
+    );
+    await repo.insertAssistantMessage(
+      conversationId: cid,
+      content: '聊聊情绪',
+      speaker: AgentRole.suxin,
+    );
+    await repo.insertUserMessage(conversationId: cid, content: 'current');
+    final slice = await slicer.build(userId: 1, conversationId: cid);
+    expect(
+      slice.recentTurns.map((m) => m.content).toList(),
+      ['问一下', '小暖：先抱抱', '苏心：聊聊情绪'],
+    );
   });
 
   test('T09-04 graph injects promptBlock and writes summary on ok', () async {

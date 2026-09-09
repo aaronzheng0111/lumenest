@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../agent/tool_acl.dart';
 import '../../app_copy.dart';
+import '../../chat/chat_suggestions_catalog.dart';
 import '../../data/conversation_repository.dart';
+import '../../domain/agent_role.dart';
 import '../../providers.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/glass_tokens.dart';
-import '../../theme/radius_tokens.dart';
 import '../../theme/spacing_tokens.dart';
 import '../../widgets/atmosphere_background.dart';
 import '../../widgets/glass/glass_app_bar.dart';
-import '../../widgets/glass/glass_container.dart';
 import 'chat_bubble.dart';
+import 'chat_composer.dart';
 import 'chat_draft_store.dart';
-import 'chat_typing_indicator.dart';
+import 'chat_pending_tools.dart';
+import 'chat_tool_status.dart';
 import 'llm_model_picker.dart';
 
 /// GROUP consult session (AC-11-F02 / F03).
@@ -33,8 +34,15 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
   bool _loading = true;
   bool _sending = false;
   bool _awaitingReply = false;
+  List<AgentTool> _pendingTools = const [];
   int? _revealMessageId;
   DateTime? _lastSendAt;
+
+  bool get _showSuggestions =>
+      !_loading &&
+      !_sending &&
+      _messages.isEmpty &&
+      _conversationId != null;
 
   @override
   void initState() {
@@ -98,13 +106,28 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
+    final bottom = SpacingTokens.xxl * 2 +
+        SpacingTokens.xl +
+        MediaQuery.paddingOf(context).bottom;
     messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(
+          SpacingTokens.pageMargin,
+          0,
+          SpacingTokens.pageMargin,
+          bottom,
+        ),
         duration: const Duration(seconds: 4),
       ),
     );
+  }
+
+  Future<void> _applySuggestion(String prompt) async {
+    _controller.text = prompt;
+    _controller.selection = TextSelection.collapsed(offset: prompt.length);
+    await _send();
   }
 
   Future<void> _send() async {
@@ -135,9 +158,16 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
       return;
     }
 
+    // Group routing may pick any speaker; all roles may use getCurrentTime.
+    final pendingTools = predictPendingTools(
+      userText: text,
+      speaker: AgentRole.xiaonuan,
+    );
+
     setState(() {
       _sending = true;
       _awaitingReply = true;
+      _pendingTools = pendingTools;
     });
     _controller.clear();
     await _persistDraft();
@@ -176,6 +206,7 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
         setState(() {
           _sending = false;
           _awaitingReply = false;
+          _pendingTools = const [];
         });
       }
     }
@@ -234,6 +265,12 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
     final topInset = GlassAppBar.contentHeight +
         MediaQuery.paddingOf(context).top +
         SpacingTokens.sm;
+    final suggestions = ref.watch(
+      chatSuggestionsForProvider((
+        scene: ChatSuggestionScene.group,
+        role: null,
+      )),
+    );
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -270,7 +307,7 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
                       itemCount: _messages.length + (_awaitingReply ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (_awaitingReply && index == _messages.length) {
-                          return const ChatTypingIndicator();
+                          return ChatAwaitingReply(tools: _pendingTools);
                         }
                         final msg = _messages[index];
                         return ChatBubble(
@@ -288,41 +325,16 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
                 SpacingTokens.pageMargin,
                 SpacingTokens.lg + MediaQuery.paddingOf(context).bottom,
               ),
-              child: GlassContainer(
-                fill: GlassFill.medium,
-                borderRadius: RadiusTokens.borderPill,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.lg,
-                  vertical: SpacingTokens.sm,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        key: const Key('chat_input'),
-                        controller: _controller,
-                        enabled: !_sending,
-                        minLines: 1,
-                        maxLines: 4,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          hintText: '向会诊团提问，可用 @林医生 / @苏心 / @阿嬷…',
-                          hintStyle:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
-                        ),
-                        onChanged: (_) => _persistDraft(),
-                      ),
-                    ),
-                    IconButton(
-                      key: const Key('chat_send'),
-                      onPressed: _sending ? null : _send,
-                      icon: const Icon(Icons.send_rounded),
-                      color: AppColors.primaryDeep,
-                    ),
-                  ],
-                ),
+              child: ChatComposer(
+                controller: _controller,
+                enabled: !_sending,
+                hintText: AppCopy.groupChatHint,
+                onSend: _send,
+                onChanged: (_) => _persistDraft(),
+                enableMentions: true,
+                showSuggestions: _showSuggestions && suggestions.isNotEmpty,
+                suggestedPrompts: suggestions,
+                onSuggestionSelected: _applySuggestion,
               ),
             ),
           ],

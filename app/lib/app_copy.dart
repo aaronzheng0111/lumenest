@@ -1,4 +1,7 @@
 /// Exact, testable copy frozen in sdd/01 and sdd/16 Specify.
+///
+/// Suggested chat prompts live in `assets/fixtures/chat_suggestions.json`
+/// ([ChatSuggestionsCatalog]). Tool display names live in [AgentToolLabels].
 abstract final class AppCopy {
   static const todayTasksPlaceholder = '今日任务将在后续版本提供';
   static const emptyConversations = '还没有对话';
@@ -47,4 +50,12 @@ abstract final class AppCopy {
   static const noTasksToday = '今天没有安排的任务';
   static const groupConsult = '群聊会诊';
   static const groupConsultNeedsUpgrade = '需要升级订阅';
+  static const roleLockedHint = '该角色暂未开放';
+  static const groupChatHint = '向会诊团提问，可用 @林医生 / @苏心 / @阿嬷…';
+
+  /// Prefix for tool-status chips; [toolName] from [AgentToolLabels].
+  static String callingTool(String toolName) => '正在调用：$toolName';
+
+  static String soloChatHint(String roleDisplayName) =>
+      '和$roleDisplayName说点什么…';
 }

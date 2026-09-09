@@ -71,7 +71,13 @@ flutter:
     - assets/brand/
     - assets/illustrations/
     - assets/avatars/
+    # Flutter only includes files directly in a listed directory — subdirs need
+    # their own entries (prompts/safety/knowledge/tasks are required at runtime).
     - assets/fixtures/
+    - assets/fixtures/prompts/
+    - assets/fixtures/safety/
+    - assets/fixtures/knowledge/
+    - assets/fixtures/tasks/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

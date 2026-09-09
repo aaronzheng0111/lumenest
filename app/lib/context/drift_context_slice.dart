@@ -115,7 +115,8 @@ class DriftContextSlicer implements ContextSlicer {
       for (final m in window)
         ChatMessageWire(
           role: m.isUser ? 'user' : 'assistant',
-          content: m.content,
+          // Shared-model multi-agent: label who spoke so one model can stay in role.
+          content: formatHistoryContent(m),
         ),
     ];
   }

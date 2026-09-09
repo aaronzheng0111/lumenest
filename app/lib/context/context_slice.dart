@@ -1,3 +1,4 @@
+import '../data/conversation_repository.dart';
 import '../llm/llm_types.dart';
 
 /// Assembled context for one agent turn (sdd/09).
@@ -11,6 +12,8 @@ class ContextSlice {
   final String promptBlock;
 
   /// Up to 20 prior user+assistant turns (excludes the current user utterance).
+  /// Assistant turns are speaker-labeled when [ChatMessage.speakerRole] is set
+  /// (shared-model multi-agent / GROUP consult).
   final List<ChatMessageWire> recentTurns;
 }
 
@@ -37,4 +40,13 @@ String truncateSummary(String content, {int maxChars = 80}) {
   final t = content.trim();
   if (t.length <= maxChars) return t;
   return t.substring(0, maxChars);
+}
+
+/// Formats one history bubble for a shared LLM transcript.
+/// User text stays raw; assistants become `小暖：…` so one model can tell speakers apart.
+String formatHistoryContent(ChatMessage message) {
+  if (!message.isAssistant) return message.content;
+  final name = message.speakerDisplayName;
+  if (name == null || name.isEmpty) return message.content;
+  return '$name：${message.content}';
 }

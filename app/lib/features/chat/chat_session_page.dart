@@ -2,22 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../agent/offline_default_reply.dart';
+import '../../agent/tool_acl.dart';
 import '../../agent/tools/get_current_time_tool.dart';
 import '../../agent/xiaonuan_graph.dart';
 import '../../app_copy.dart';
+import '../../chat/chat_suggestions_catalog.dart';
 import '../../data/conversation_repository.dart';
 import '../../domain/agent_role.dart';
 import '../../providers.dart';
-import '../../theme/app_colors.dart';
 import '../../theme/glass_tokens.dart';
-import '../../theme/radius_tokens.dart';
 import '../../theme/spacing_tokens.dart';
 import '../../widgets/atmosphere_background.dart';
 import '../../widgets/glass/glass_app_bar.dart';
 import '../../widgets/glass/glass_container.dart';
 import 'chat_bubble.dart';
+import 'chat_composer.dart';
 import 'chat_draft_store.dart';
-import 'chat_typing_indicator.dart';
+import 'chat_pending_tools.dart';
+import 'chat_tool_status.dart';
 import 'llm_model_picker.dart';
 
 class ChatSessionPage extends ConsumerStatefulWidget {
@@ -37,10 +39,17 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
   bool _loading = true;
   bool _sending = false;
   bool _awaitingReply = false;
+  List<AgentTool> _pendingTools = const [];
   int? _revealMessageId;
   DateTime? _lastSendAt;
 
   bool get _locked => !widget.role.isUnlocked;
+
+  /// Show chips in every chat window, including locked roles (fill-on-tap OK).
+  bool get _showSuggestions =>
+      !_loading &&
+      !_sending &&
+      (_locked || (_messages.isEmpty && _conversationId != null));
 
   @override
   void initState() {
@@ -108,13 +117,29 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
+    final bottom = SpacingTokens.xxl * 2 +
+        SpacingTokens.xl +
+        MediaQuery.paddingOf(context).bottom;
     messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(
+          SpacingTokens.pageMargin,
+          0,
+          SpacingTokens.pageMargin,
+          bottom,
+        ),
         duration: const Duration(seconds: 4),
       ),
     );
+  }
+
+  Future<void> _applySuggestion(String prompt) async {
+    _controller.text = prompt;
+    _controller.selection = TextSelection.collapsed(offset: prompt.length);
+    if (_locked) return;
+    await _send();
   }
 
   Future<void> _send() async {
@@ -145,9 +170,15 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
       return;
     }
 
+    final pendingTools = predictPendingTools(
+      userText: text,
+      speaker: widget.role,
+    );
+
     setState(() {
       _sending = true;
       _awaitingReply = true;
+      _pendingTools = pendingTools;
     });
     _controller.clear();
     await _persistDraft();
@@ -191,6 +222,7 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
           llmCalls: 0,
           assistantMessageId: id,
           usedOfflineDefault: true,
+          toolsUsed: pendingTools,
         );
       }
 
@@ -205,12 +237,12 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
     } catch (e, st) {
       debugPrint('chat send failed: $e\n$st');
       _showSnack('${AppCopy.chatSendFailed}（$e）');
-
     } finally {
       if (mounted) {
         setState(() {
           _sending = false;
           _awaitingReply = false;
+          _pendingTools = const [];
         });
       }
     }
@@ -280,6 +312,12 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
     final topInset = GlassAppBar.contentHeight +
         MediaQuery.paddingOf(context).top +
         SpacingTokens.sm;
+    final suggestions = ref.watch(
+      chatSuggestionsForProvider((
+        scene: ChatSuggestionScene.solo,
+        role: widget.role,
+      )),
+    );
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -337,7 +375,7 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
                       itemCount: _messages.length + (_awaitingReply ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (_awaitingReply && index == _messages.length) {
-                          return const ChatTypingIndicator();
+                          return ChatAwaitingReply(tools: _pendingTools);
                         }
                         final msg = _messages[index];
                         return ChatBubble(
@@ -355,47 +393,18 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
                 SpacingTokens.pageMargin,
                 SpacingTokens.lg + MediaQuery.paddingOf(context).bottom,
               ),
-              child: GlassContainer(
-                fill: GlassFill.medium,
-                borderRadius: RadiusTokens.borderPill,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.lg,
-                  vertical: SpacingTokens.sm,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        key: const Key('chat_input'),
-                        controller: _controller,
-                        enabled: !_locked && !_sending,
-                        minLines: 1,
-                        maxLines: 4,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) {
-                          if (!_locked && !_sending) _send();
-                        },
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          hintText: _locked
-                              ? '该角色暂未开放'
-                              : '和${widget.role.displayName}说点什么…',
-                          hintStyle:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
-                        ),
-                        onChanged: (_) => _persistDraft(),
-                      ),
-                    ),
-                    IconButton(
-                      key: const Key('chat_send'),
-                      onPressed: (_locked || _sending) ? null : _send,
-                      icon: const Icon(Icons.send_rounded),
-                      color: AppColors.primaryDeep,
-                    ),
-                  ],
-                ),
+              child: ChatComposer(
+                controller: _controller,
+                enabled: !_locked && !_sending,
+                hintText: _locked
+                    ? AppCopy.roleLockedHint
+                    : AppCopy.soloChatHint(widget.role.displayName),
+                onSend: _send,
+                onChanged: (_) => _persistDraft(),
+                enableMentions: !_locked,
+                showSuggestions: _showSuggestions && suggestions.isNotEmpty,
+                suggestedPrompts: suggestions,
+                onSuggestionSelected: _applySuggestion,
               ),
             ),
           ],

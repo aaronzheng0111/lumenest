@@ -16,6 +16,7 @@ import 'data/user_profile_repository.dart';
 import 'domain/agent_role.dart';
 import 'domain/user_profile_snapshot.dart';
 import 'knowledge/knowledge_retriever.dart';
+import 'chat/chat_suggestions_catalog.dart';
 import 'llm/dio_llm_client.dart';
 import 'llm/llm_model_catalog.dart';
 import 'llm/llm_model_selection_store.dart';
@@ -91,6 +92,25 @@ final safetyGateProvider = FutureProvider<SafetyGate>((ref) async {
 
 final llmModelCatalogProvider = FutureProvider<LlmModelCatalog>((ref) {
   return loadLlmModelCatalog();
+});
+
+/// Recommended prompts for chat composers ([ChatSuggestionsCatalog]).
+final chatSuggestionsCatalogProvider =
+    FutureProvider<ChatSuggestionsCatalog>((ref) {
+  return ChatSuggestionsCatalog.load();
+});
+
+/// Resolved prompt chips for a chat scene (and optional role override).
+///
+/// Watches [chatSuggestionsCatalogProvider]; returns `[]` while loading/error
+/// so composers can hide suggestions without special-casing AsyncValue.
+final chatSuggestionsForProvider = Provider.autoDispose
+    .family<List<String>, ({String scene, AgentRole? role})>((ref, args) {
+  return ref.watch(chatSuggestionsCatalogProvider).maybeWhen(
+        data: (catalog) =>
+            catalog.suggestionsFor(args.scene, role: args.role),
+        orElse: () => const <String>[],
+      );
 });
 
 final llmModelSelectionStoreProvider = Provider<LlmModelSelectionStore>((ref) {

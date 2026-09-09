@@ -187,6 +187,12 @@ void main() {
     await _pumpApp(tester);
     await tester.tap(find.byKey(const Key('role_XIAONUAN')));
     await tester.pumpAndSettle();
+    // Bootstrap may snack when DB isn't ready in widget tests; clear so send is hittable.
+    final messenger = ScaffoldMessenger.of(
+      tester.element(find.byKey(const Key('chat_send'))),
+    );
+    messenger.hideCurrentSnackBar();
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat_send')));
     await tester.pump();
     expect(find.text(AppCopy.privacyRequiredToChat), findsOneWidget);

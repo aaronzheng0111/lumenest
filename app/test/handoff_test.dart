@@ -90,16 +90,58 @@ void main() {
     );
     expect(result.llmCalls, 2);
     expect(llm.calls, 2);
+    // Second shared-model call must see the first speaker's full labeled reply.
+    expect(llm.callMessages.length, 2);
+    final second = llm.callMessages[1];
+    expect(second.first.role, 'system');
+    expect(second.first.content, contains('【会诊】'));
+    expect(second.first.content, contains('苏心'));
+    expect(
+      second.map((m) => '${m.role}:${m.content}').toList(),
+      containsAllInOrder([
+        'user:心情不好但还能撑',
+        'assistant:小暖：回复1',
+      ]),
+    );
     final msgs = await repo.listMessages(cid);
     final assistants = msgs.where((m) => m.isAssistant).toList();
     expect(assistants.length, 2);
     expect(assistants[0].speakerRole, 'XIAONUAN');
     expect(assistants[1].speakerRole, 'SUXIN');
   });
+
+  test('group graph survives RolePrompts load failure', () async {
+    final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+    await db.init();
+    addTearDown(db.close);
+    final repo = DriftConversationRepository(db);
+    final llm = _CountingLlm();
+    final graph = GroupConsultGraph(
+      safety: _PassGate(),
+      retriever: FakeKnowledgeRetriever(),
+      llm: llm,
+      messages: repo,
+      slicer: EmptyContextSlicer(),
+      summaryWriter: NoopSummaryWriter(),
+      routerRules: const [],
+      promptLoader: (_) async =>
+          throw StateError('Unable to load asset: prompts'),
+      offlineReplyDelay: Duration.zero,
+    );
+    final cid = await repo.getOrCreateGroup();
+    await repo.insertUserMessage(conversationId: cid, content: '你好');
+    final result = await graph.handle(
+      conversationId: cid,
+      userText: '你好',
+    );
+    expect(result.llmCalls, 1);
+    expect(result.assistantContent, isNotEmpty);
+  });
 }
 
 class _CountingLlm implements LlmClient {
   int calls = 0;
+  final List<List<ChatMessageWire>> callMessages = [];
 
   @override
   bool get canCallRemote => true;
@@ -110,6 +152,7 @@ class _CountingLlm implements LlmClient {
     required String requestId,
   }) async {
     calls++;
+    callMessages.add(List.of(messages));
     return LlmResult(status: LlmStatus.ok, content: '回复$calls');
   }
 }

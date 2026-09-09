@@ -13,6 +13,11 @@ import 'tools/get_current_time_tool.dart';
 import 'xiaonuan_graph.dart';
 
 /// GROUP turn: Safety → route → 1–2 LLM speakers → persist (AC-11-B04/B05).
+///
+/// All speakers share the same [LlmClient] (one model). Context mirrors
+/// [XiaonuanGraph]: system = role prompt + slice.promptBlock + KB/tools, then a
+/// single growing transcript (labeled assistants) so the second speaker sees the
+/// first's full reply — not a truncated system note.
 class GroupConsultGraph {
   GroupConsultGraph({
     required this.safety,
@@ -88,26 +93,42 @@ class GroupConsultGraph {
       conversationId: conversationId,
     );
 
+    // Same shape as XiaonuanGraph: prior turns, then this user utterance once.
+    // Each completed speaker appends a labeled assistant turn for the next call.
+    final transcript = <ChatMessageWire>[
+      ...slice.recentTurns,
+      ChatMessageWire(role: 'user', content: userText),
+    ];
+
     var llmCalls = 0;
     String? lastContent;
     int? lastId;
     final allSources = <String>[];
     final toolsUsed = <AgentTool>[];
     var usedOffline = false;
-    String? previousRef;
     final timeResult = _maybeRunCurrentTime(
       speakers.isEmpty ? AgentRole.xiaonuan : speakers.first,
       userText,
       toolsUsed,
     );
+    final speakerList = speakers.take(2).toList();
 
-    for (final speaker in speakers.take(2)) {
-      final prompt = await promptLoader(speaker);
+    for (final speaker in speakerList) {
+      String prompt;
+      try {
+        prompt = await promptLoader(speaker);
+      } catch (_) {
+        prompt = '你是${speaker.displayName}';
+      }
       final hits = await _retrieveForRole(speaker, userText);
       final sources = hits.map((h) => h.title).take(3).toList();
       allSources.addAll(sources);
 
       var system = '$prompt\n${slice.promptBlock}';
+      system = '$system\n【会诊身份】你当前角色是「${speaker.displayName}」。'
+          '开场与回答必须明确以该身份自居；严禁声称自己是其他角色'
+          '（例如角色不是小暖时，不得自称小暖）。'
+          '历史消息里带姓名前缀的是其他会诊成员说的话，仅作参考，不要冒充。';
       if (hits.isNotEmpty) {
         final buf = StringBuffer('\n【本地资料】\n');
         for (final h in hits) {
@@ -117,9 +138,6 @@ class GroupConsultGraph {
       }
       if (timeResult != null) {
         system = '$system\n【工具】${GetCurrentTimeTool.name}=$timeResult';
-      }
-      if (previousRef != null) {
-        system = '$system\n【上一助手】$previousRef';
       }
 
       final String content;
@@ -140,8 +158,7 @@ class GroupConsultGraph {
         final result = await llm.complete(
           messages: [
             ChatMessageWire(role: 'system', content: system),
-            ...slice.recentTurns,
-            ChatMessageWire(role: 'user', content: userText),
+            ...transcript,
           ],
           requestId:
               'grp-${speaker.wireId}-${DateTime.now().microsecondsSinceEpoch}',
@@ -162,8 +179,8 @@ class GroupConsultGraph {
       }
       lastContent = content;
 
-      final handoffRef = speakers.length > 1
-          ? 'handoff:${speakers.map((s) => s.wireId).join('>')}'
+      final handoffRef = speakerList.length > 1
+          ? 'handoff:${speakerList.map((s) => s.wireId).join('>')}'
           : null;
       lastId = await messages.insertAssistantMessage(
         conversationId: conversationId,
@@ -172,8 +189,14 @@ class GroupConsultGraph {
         sourceTitles: sources,
         agentReplyRef: handoffRef,
       );
-      previousRef =
-          '${speaker.displayName}: ${content.length > 40 ? content.substring(0, 40) : content}';
+
+      // Feed the next shared-model call the full reply (xiaonuan-style transcript).
+      transcript.add(
+        ChatMessageWire(
+          role: 'assistant',
+          content: '${speaker.displayName}：$content',
+        ),
+      );
 
       if (writeSummary) {
         await summaryWriter.writeTurnSummary(
