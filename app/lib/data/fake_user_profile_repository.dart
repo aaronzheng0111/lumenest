@@ -1,6 +1,7 @@
 import '../domain/rich_user_profile.dart';
 import '../domain/stage.dart';
 import '../domain/user_profile_snapshot.dart';
+import 'demo_moms.dart';
 import 'user_profile_repository.dart';
 
 /// Stand-in for widget tests that do not need Drift.
@@ -19,7 +20,18 @@ class FakeUserProfileRepository implements UserProfileRepository {
   int saveRichCalls = 0;
   ProfileEdits? lastEdits;
   final List<LocalAccount> accounts = [
-    const LocalAccount(id: 1, nickname: '妈妈', isActive: true),
+    for (final m in DemoMoms.all)
+      LocalAccount(
+        id: m.id,
+        nickname: m.nickname,
+        isActive: m.id == 1,
+        stageLabel: m.status == PregnancyStatus.tryingToConceive
+            ? '备孕'
+            : m.status == PregnancyStatus.pregnant
+                ? '孕期'
+                : '产后',
+        subtitle: m.blurb,
+      ),
   ];
   int activeUserId = 1;
 

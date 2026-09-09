@@ -1,0 +1,28 @@
+[
+  {
+    "id": 1,
+    "nickname": "晓晓·备孕",
+    "period": "备孕",
+    "pregnancyStatus": "TRYING",
+    "lmpDaysAgo": 12,
+    "notes": "本地演示账号：备孕中，有末次月经、无预产期。日期相对「今天」由 App 启动时计算。"
+  },
+  {
+    "id": 2,
+    "nickname": "林林·孕期",
+    "period": "孕期",
+    "pregnancyStatus": "PREGNANT",
+    "lmpDaysAgo": 139,
+    "dueDaysFromToday": 141,
+    "notes": "本地演示账号：约孕 20 周。切换账号即可对比首页旅程/任务。"
+  },
+  {
+    "id": 3,
+    "nickname": "安安·产后",
+    "period": "产后",
+    "pregnancyStatus": "POSTPARTUM",
+    "birthDaysAgo": 14,
+    "dueDaysFromToday": -14,
+    "notes": "本地演示账号：产后约第 2 周（产褥期）。"
+  }
+]

@@ -1,3 +1,4 @@
+import 'effective_journey.dart';
 import 'stage.dart';
 import 'rich_user_profile.dart';
 
@@ -44,30 +45,21 @@ final class UserProfileSnapshot {
 
   int? get ageYears => rich.ageYears();
 
-  /// AC-01-F01 week line.
-  String get weekLabel {
-    switch (stage) {
-      case Stage.prep:
-        return '备孕中';
-      case Stage.pregnant:
-        final w = (weekValue != null && weekValue! >= 1) ? weekValue! : 1;
-        return '孕$w周';
-      case Stage.delivery:
-        if (weekValue != null && weekValue! >= 1) {
-          return '产褥第$weekValue周';
-        }
-        return '待回填分娩日期';
-      case Stage.postpartum:
-        final w = (weekValue != null && weekValue! >= 1) ? weekValue! : 1;
-        return '产后第$w周';
-    }
-  }
+  /// AC-01-F01 week line (Stage SSOT via [EffectiveJourney]).
+  String get weekLabel =>
+      EffectiveJourney.fromSnapshot(this).weekLabel;
 
   /// Compact agent prompt line (sensitive medical kept abstract).
-  String get agentArchiveLine => rich.agentContextSummary(
-        nickname: nickname,
-        stageLabel: stageLabel,
-        weekValue: weekValue,
-        weekUnit: weekUnit,
-      );
+  String get agentArchiveLine {
+    final journey = EffectiveJourney.fromSnapshot(this);
+    return rich.agentContextSummary(
+      nickname: nickname,
+      primaryLabel: journey.primaryLabel,
+      weekValue: journey.weekValue,
+      weekUnit: journey.weekUnit,
+      trimester: journey.trimester,
+      includePrenatalVitamin: journey.showPrenatalVitaminNudge,
+      includeBabyMovement: journey.showBabyMovement,
+    );
+  }
 }

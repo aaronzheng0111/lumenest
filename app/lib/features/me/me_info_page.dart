@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app_copy.dart';
+import '../../domain/effective_journey.dart';
 import '../../domain/user_profile_snapshot.dart';
 import '../../providers.dart';
 import '../../theme/app_colors.dart';
@@ -250,7 +251,13 @@ class MeInfoPage extends ConsumerWidget {
                     ),
                   ),
                   title: Text(a.nickname),
-                  subtitle: Text('ID ${a.id}'),
+                  subtitle: Text(
+                    [
+                      if (a.stageLabel != null) a.stageLabel!,
+                      if (a.subtitle != null) a.subtitle!,
+                      'ID ${a.id}',
+                    ].join(' · '),
+                  ),
                   trailing: a.isActive
                       ? const Icon(Icons.check_circle, color: AppColors.tertiary)
                       : null,
@@ -461,7 +468,7 @@ class _ProfileHero extends StatelessWidget {
                 ),
                 const SizedBox(height: SpacingTokens.xs),
                 Text(
-                  '${snapshot.stageLabel} · ${snapshot.weekLabel}',
+                  EffectiveJourney.fromSnapshot(snapshot).primaryLabel,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.onSurfaceVariant,
                       ),
@@ -491,14 +498,18 @@ class _TodayStrip extends StatelessWidget {
     return snapshotAsync.maybeWhen(
       data: (snap) {
         final c = snap.rich.todayCheckIn;
+        final journey = EffectiveJourney.fromSnapshot(snap);
         final chips = <String>[
           if (c.waterMl != null) '水 ${c.waterMl!.round()}ml',
           if (c.weightKg != null) '体重 ${c.weightKg}kg',
           if (c.sleepHours != null) '睡 ${c.sleepHours}h',
           if (c.steps != null) '步 ${c.steps}',
           if (c.mood != null && c.mood!.isNotEmpty) '心情 ${c.mood}',
-          if (c.babyMovementCount != null) '胎动 ${c.babyMovementCount}',
-          if (c.prenatalVitaminTaken == true) '已服孕维',
+          if (journey.showBabyMovement && c.babyMovementCount != null)
+            '胎动 ${c.babyMovementCount}',
+          if (journey.showPrenatalVitaminNudge &&
+              c.prenatalVitaminTaken == true)
+            '已服孕维',
         ];
         if (chips.isEmpty) {
           return GlassContainer(

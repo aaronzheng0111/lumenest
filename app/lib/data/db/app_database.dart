@@ -1,5 +1,8 @@
 import 'package:drift/drift.dart';
 
+import '../demo_moms.dart';
+import '../../domain/stage.dart';
+import '../../domain/stage_resolver.dart';
 import 'domain_enums.dart';
 import 'tables.dart';
 
@@ -68,39 +71,114 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  /// P1: ensure single user id=1 and a FREE subscription row.
-  Future<void> ensureSeedRows() async {
+  /// Ensures three demo moms (备孕 / 孕期 / 产后) + FREE subscriptions.
+  ///
+  /// Missing ids are inserted. Existing rows are left alone so real edits
+  /// survive re-init (except a pristine default `妈妈` id=1 is upgraded once).
+  Future<void> ensureSeedRows({DateTime? today}) async {
     final now = DateTime.now().toUtc();
-    final existing = await (select(users)..where((t) => t.id.equals(1)))
-        .getSingleOrNull();
-    if (existing == null) {
-      await into(users).insert(
-        UsersCompanion.insert(
-          id: const Value(1),
-          nickname: const Value('妈妈'),
-          stage: const Value(StageWire.prep),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-    }
+    final day = calendarDay(today ?? DateTime.now());
 
-    final subs = await (select(subscriptions)
-          ..where((t) => t.userId.equals(1)))
-        .get();
-    if (subs.isEmpty) {
-      await into(subscriptions).insert(
-        SubscriptionsCompanion.insert(
-          userId: 1,
-          plan: PlanWire.free,
-          startAt: now,
-          dailyChatQuota: 1,
-          monthlyReportQuota: 0,
-          groupConsultEnabled: const Value(false),
-        ),
-      );
+    for (final mom in DemoMoms.all) {
+      final row =
+          await (select(users)..where((t) => t.id.equals(mom.id)))
+              .getSingleOrNull();
+      if (row == null) {
+        await _insertDemoMom(mom, day: day, now: now);
+      } else if (mom.id == 1 && _isPristineDefaultMom(row)) {
+        await _upgradePristineDefaultToPrep(mom, day: day, now: now);
+      }
+      await _ensureFreeSubscription(mom.id, now: now);
     }
   }
+
+  bool _isPristineDefaultMom(User row) {
+    return row.nickname == '妈妈' &&
+        row.dueDate == null &&
+        row.birthDate == null &&
+        row.lastMenstruationDate == null &&
+        (row.profileJson.isEmpty || row.profileJson == '{}');
+  }
+
+  Future<void> _upgradePristineDefaultToPrep(
+    DemoMom mom, {
+    required DateTime day,
+    required DateTime now,
+  }) async {
+    final dates = mom.datesFor(day);
+    final resolved = resolveStage(
+      today: day,
+      dueDate: dates.due,
+      birthDate: dates.birth,
+      lastMenstruationDate: dates.lmp,
+    );
+    await (update(users)..where((u) => u.id.equals(mom.id))).write(
+      UsersCompanion(
+        nickname: Value(mom.nickname),
+        stage: Value(_stageWire(resolved.stage)),
+        lastMenstruationDate: Value(dates.lmp),
+        dueDate: Value(dates.due),
+        birthDate: Value(dates.birth),
+        pregnancyWeek: Value(resolved.pregnancyWeek),
+        postpartumWeek: Value(resolved.postpartumWeek),
+        profileJson: Value(mom.richProfile.encode()),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
+  Future<void> _insertDemoMom(
+    DemoMom mom, {
+    required DateTime day,
+    required DateTime now,
+  }) async {
+    final dates = mom.datesFor(day);
+    final resolved = resolveStage(
+      today: day,
+      dueDate: dates.due,
+      birthDate: dates.birth,
+      lastMenstruationDate: dates.lmp,
+    );
+    await into(users).insert(
+      UsersCompanion.insert(
+        id: Value(mom.id),
+        nickname: Value(mom.nickname),
+        stage: Value(_stageWire(resolved.stage)),
+        lastMenstruationDate: Value(dates.lmp),
+        dueDate: Value(dates.due),
+        birthDate: Value(dates.birth),
+        pregnancyWeek: Value(resolved.pregnancyWeek),
+        postpartumWeek: Value(resolved.postpartumWeek),
+        profileJson: Value(mom.richProfile.encode()),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> _ensureFreeSubscription(int userId, {required DateTime now}) async {
+    final subs = await (select(subscriptions)
+          ..where((t) => t.userId.equals(userId)))
+        .get();
+    if (subs.isNotEmpty) return;
+    await into(subscriptions).insert(
+      SubscriptionsCompanion.insert(
+        userId: userId,
+        plan: PlanWire.free,
+        startAt: now,
+        dailyChatQuota: 1,
+        monthlyReportQuota: 0,
+        groupConsultEnabled: const Value(false),
+      ),
+    );
+  }
+
+  static String _stageWire(Stage stage) => switch (stage) {
+        Stage.prep => StageWire.prep,
+        Stage.pregnant => StageWire.pregnant,
+        Stage.delivery => StageWire.delivery,
+        Stage.postpartum => StageWire.postpartum,
+      };
 
   Future<Set<String>> listTableNames() async {
     final rows = await customSelect(

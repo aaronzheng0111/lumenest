@@ -1,5 +1,10 @@
 import '../../data/user_profile_repository.dart';
+import '../../domain/effective_journey.dart';
+import '../../domain/identity_dates.dart';
+import '../../domain/identity_reconcile.dart';
+import '../../domain/profile_consistency.dart';
 import '../../domain/rich_user_profile.dart';
+import '../../domain/stage_resolver.dart';
 
 /// Result of a local profile-mutating tool call.
 final class ProfileToolResult {
@@ -15,6 +20,7 @@ final class ProfileToolResult {
 /// Local tool: update rich profile / daily check-in from chat intents.
 ///
 /// Writes through [UserProfileRepository] — same SSOT as Profile UI editors.
+/// Identity intents mutate dates via [IdentityReconciler], not status-only.
 abstract final class UpdateProfileTool {
   static const name = 'update_profile';
 
@@ -85,6 +91,14 @@ abstract final class UpdateProfileTool {
     final day = now ?? DateTime.now();
     final changes = <String>[];
 
+    final draft = await profiles.loadDraft();
+    var dates = IdentityDates(
+      lastMenstruationDate: draft.lastMenstruationDate,
+      dueDate: draft.dueDate,
+      birthDate: draft.birthDate,
+    );
+    var datesDirty = false;
+
     await profiles.updateRichProfile((current) {
       var profile = current;
       var check = current.todayCheckIn;
@@ -96,32 +110,64 @@ abstract final class UpdateProfileTool {
         check = DailyCheckIn(localDate: checkDay);
       }
 
-      final weekMatch =
-          _weekZh.firstMatch(t) ?? _weekZhAlt.firstMatch(t) ?? _weekEn.firstMatch(t);
+      final weekMatch = _weekZh.firstMatch(t) ??
+          _weekZhAlt.firstMatch(t) ??
+          _weekEn.firstMatch(t);
       if (weekMatch != null) {
         final w = int.tryParse(weekMatch.group(1)!);
         if (w != null && w >= 1 && w <= 42) {
-          profile = profile.copyWith(
-            pregnancyStatus: PregnancyStatus.pregnant,
-            pregnancyWeekOverride: w,
+          final reconciled = IdentityReconciler.applyWeekOverrideWriteThrough(
+            week: w,
+            rich: profile.copyWith(todayCheckIn: check),
+            dates: dates,
+            today: day,
           );
+          dates = reconciled.dates;
+          datesDirty = true;
+          profile = reconciled.rich;
+          check = profile.todayCheckIn;
           changes.add('孕周更新为第$w周');
         }
       } else if (t.contains('我怀孕') ||
           t.toLowerCase().contains('i am pregnant') ||
           t.toLowerCase().contains("i'm pregnant")) {
-        profile = profile.copyWith(pregnancyStatus: PregnancyStatus.pregnant);
+        final reconciled = IdentityReconciler.reconcileOnStatusIntent(
+          status: PregnancyStatus.pregnant,
+          rich: profile.copyWith(todayCheckIn: check),
+          dates: dates,
+          today: day,
+        );
+        dates = reconciled.dates;
+        datesDirty = true;
+        profile = reconciled.rich;
+        check = profile.todayCheckIn;
         changes.add('妊娠状态：怀孕中');
       } else if (t.contains('备孕') ||
           t.contains('想怀孕') ||
           t.toLowerCase().contains('trying to conceive')) {
-        profile = profile.copyWith(
-          pregnancyStatus: PregnancyStatus.tryingToConceive,
+        final reconciled = IdentityReconciler.reconcileOnStatusIntent(
+          status: PregnancyStatus.tryingToConceive,
+          rich: profile.copyWith(todayCheckIn: check),
+          dates: dates,
+          today: day,
         );
+        dates = reconciled.dates;
+        datesDirty = true;
+        profile = reconciled.rich;
+        check = profile.todayCheckIn;
         changes.add('妊娠状态：备孕中');
       } else if (t.contains('产后') ||
           t.toLowerCase().contains('postpartum')) {
-        profile = profile.copyWith(pregnancyStatus: PregnancyStatus.postpartum);
+        final reconciled = IdentityReconciler.reconcileOnStatusIntent(
+          status: PregnancyStatus.postpartum,
+          rich: profile.copyWith(todayCheckIn: check),
+          dates: dates,
+          today: day,
+        );
+        dates = reconciled.dates;
+        datesDirty = true;
+        profile = reconciled.rich;
+        check = profile.todayCheckIn;
         changes.add('妊娠状态：产后');
       }
 
@@ -207,8 +253,24 @@ abstract final class UpdateProfileTool {
       if (kickMatch != null) {
         final k = int.tryParse(kickMatch.group(1)!);
         if (k != null) {
-          check = check.copyWith(localDate: checkDay, babyMovementCount: k);
-          changes.add('今日胎动：$k 次');
+          final stage = resolveStage(
+            today: day,
+            dueDate: dates.dueDate,
+            birthDate: dates.birthDate,
+            lastMenstruationDate: dates.lastMenstruationDate,
+          );
+          final journey = EffectiveJourney.from(
+            stage: stage.stage,
+            weekValue: stage.weekValue,
+            weekUnit: stage.weekUnit,
+            rich: profile,
+            dates: dates,
+            today: day,
+          );
+          if (journey.showBabyMovement) {
+            check = check.copyWith(localDate: checkDay, babyMovementCount: k);
+            changes.add('今日胎动：$k 次');
+          }
         }
       }
 
@@ -277,34 +339,19 @@ abstract final class UpdateProfileTool {
       }
 
       if (changes.isEmpty) return current;
-      return profile.copyWith(todayCheckIn: check);
+      return ProfileConsistencyValidator.normalizeCertaintyLists(
+        profile.copyWith(todayCheckIn: check),
+      );
     });
 
-    // Sync pregnancy week into stage columns when LMP/due are missing.
-    final weekOnly = _weekZh.firstMatch(t) ?? _weekZhAlt.firstMatch(t);
-    if (weekOnly != null) {
-      final w = int.tryParse(weekOnly.group(1)!);
-      if (w != null && w >= 1 && w <= 42) {
-        final draft = await profiles.loadDraft();
-        if (draft.dueDate == null && draft.lastMenstruationDate == null) {
-          final lmp = DateTime(day.year, day.month, day.day)
-              .subtract(Duration(days: (w - 1) * 7));
-          final due = lmp.add(const Duration(days: 280));
-          try {
-            await profiles.saveEdits(
-              ProfileEdits(
-                lastMenstruationDate: lmp,
-                dueDate: due,
-              ),
-              today: day,
-            );
-            if (!changes.any((c) => c.contains('孕周'))) {
-              changes.add('孕周更新为第$w周');
-            }
-          } on ProfileValidationException {
-            // Rich profile still updated; stage sync is best-effort.
-          }
-        }
+    if (datesDirty) {
+      try {
+        await profiles.saveEdits(
+          ProfileEdits.fromIdentityDates(dates),
+          today: day,
+        );
+      } on ProfileValidationException {
+        // Rich profile still updated; stage sync is best-effort.
       }
     }
 

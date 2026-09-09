@@ -806,11 +806,17 @@ final class RichUserProfile {
   }
 
   /// Agent-facing summary — omits raw sensitive dumps; uses counts/abstracts.
+  ///
+  /// Pass [primaryLabel] / week / trimester from [EffectiveJourney] so identity
+  /// stays Stage-SSOT (no second conflicting `妊娠状态=` line).
   String agentContextSummary({
     required String nickname,
-    required String stageLabel,
+    required String primaryLabel,
     int? weekValue,
     String? weekUnit,
+    int? trimester,
+    bool includePrenatalVitamin = false,
+    bool includeBabyMovement = false,
   }) {
     final parts = <String>[];
     parts.add('昵称=$nickname');
@@ -823,14 +829,12 @@ final class RichUserProfile {
     if (occupation != null && occupation!.isNotEmpty) {
       parts.add('职业=$occupation');
     }
-    parts.add('阶段=$stageLabel');
+    parts.add('阶段=$primaryLabel');
     if (weekValue != null) {
       parts.add('周次=$weekValue${weekUnit ?? ''}');
     }
-    final tri = trimesterFromWeek(weekValue ?? pregnancyWeekOverride);
-    if (tri != null) parts.add('孕期=$tri');
-    if (pregnancyStatus != PregnancyStatus.unset) {
-      parts.add('妊娠状态=${pregnancyStatus.label}');
+    if (trimester != null) {
+      parts.add('孕期=$trimester');
     }
     if (numberOfChildren != null) parts.add('子女数=$numberOfChildren');
     if (dietPreference != DietPreference.unset) {
@@ -859,8 +863,10 @@ final class RichUserProfile {
     if (check.sleepHours != null) todayBits.add('睡眠${check.sleepHours}h');
     if (check.steps != null) todayBits.add('步数${check.steps}');
     if (check.mood != null) todayBits.add('心情${check.mood}');
-    if (check.prenatalVitaminTaken == true) todayBits.add('已服叶酸/孕维');
-    if (check.babyMovementCount != null) {
+    if (includePrenatalVitamin && check.prenatalVitaminTaken == true) {
+      todayBits.add('已服叶酸/孕维');
+    }
+    if (includeBabyMovement && check.babyMovementCount != null) {
       todayBits.add('胎动${check.babyMovementCount}');
     }
     if (todayBits.isNotEmpty) parts.add('今日=${todayBits.join("、")}');

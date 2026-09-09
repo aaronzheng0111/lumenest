@@ -1,3 +1,4 @@
+import '../domain/identity_dates.dart';
 import '../domain/rich_user_profile.dart';
 import '../domain/user_profile_snapshot.dart';
 
@@ -20,6 +21,22 @@ final class ProfileEdits {
   final bool clearLastMenstruationDate;
   final bool clearDueDate;
   final bool clearBirthDate;
+
+  /// Absolute write of [IdentityDates] (null fields clear the column).
+  factory ProfileEdits.fromIdentityDates(
+    IdentityDates dates, {
+    String? nickname,
+  }) {
+    return ProfileEdits(
+      nickname: nickname,
+      lastMenstruationDate: dates.lastMenstruationDate,
+      dueDate: dates.dueDate,
+      birthDate: dates.birthDate,
+      clearLastMenstruationDate: dates.lastMenstruationDate == null,
+      clearDueDate: dates.dueDate == null,
+      clearBirthDate: dates.birthDate == null,
+    );
+  }
 }
 
 /// Editable stage fields shown on the pregnancy stage form (no Drift types).
@@ -43,11 +60,19 @@ final class LocalAccount {
     required this.id,
     required this.nickname,
     required this.isActive,
+    this.stageLabel,
+    this.subtitle,
   });
 
   final int id;
   final String nickname;
   final bool isActive;
+
+  /// Short stage chip: 备孕 / 孕期 / 生产 / 产后.
+  final String? stageLabel;
+
+  /// Optional blurb under the nickname (demo moms).
+  final String? subtitle;
 }
 
 /// Thrown when [UserProfileRepository.saveEdits] rejects input (AC-03-F03).

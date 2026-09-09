@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/user_profile_repository.dart';
+import '../../domain/effective_journey.dart';
+import '../../domain/identity_dates.dart';
+import '../../domain/identity_reconcile.dart';
+import '../../domain/profile_consistency.dart';
 import '../../domain/rich_user_profile.dart';
+import '../../domain/stage.dart';
 import '../../domain/user_profile_snapshot.dart';
 import '../../providers.dart';
 import '../../theme/spacing_tokens.dart';
@@ -29,6 +35,7 @@ class _PregnancySectionPageState extends ConsumerState<PregnancySectionPage> {
   final _fertility = TextEditingController();
   bool? _firstPregnancy;
   DateTime? _conception;
+  Stage _stage = Stage.prep;
   bool _loading = true;
   bool _saving = false;
 
@@ -52,11 +59,17 @@ class _PregnancySectionPageState extends ConsumerState<PregnancySectionPage> {
   }
 
   Future<void> _load() async {
-    final rich = await ref.read(userProfileRepositoryProvider).loadRichProfile();
+    final repo = ref.read(userProfileRepositoryProvider);
+    final rich = await repo.loadRichProfile();
+    final snap = await repo.getSnapshot();
     if (!mounted) return;
     setState(() {
       _status = rich.pregnancyStatus;
-      _week.text = rich.pregnancyWeekOverride?.toString() ?? '';
+      _stage = snap.stage;
+      _week.text = rich.pregnancyWeekOverride?.toString() ??
+          (snap.stage == Stage.pregnant && snap.weekValue != null
+              ? '${snap.weekValue}'
+              : '');
       _prevPreg.text = rich.previousPregnancies?.toString() ?? '';
       _children.text = rich.numberOfChildren?.toString() ?? '';
       _hospital.text = rich.preferredMaternityHospital ?? '';
@@ -70,16 +83,21 @@ class _PregnancySectionPageState extends ConsumerState<PregnancySectionPage> {
     });
   }
 
+  bool get _showWeekField =>
+      _status == PregnancyStatus.pregnant || _stage == Stage.pregnant;
 
   Future<void> _save() async {
     if (_saving) return;
     await runProfileSectionSave(
       context: context,
       setSaving: (v) => setState(() => _saving = v),
-      save: () => commitRichProfile(ref, (current) {
-        return current.copyWith(
-          pregnancyStatus: _status,
-          pregnancyWeekOverride: int.tryParse(_week.text.trim()),
+      save: () async {
+        final repo = ref.read(userProfileRepositoryProvider);
+        final draft = await repo.loadDraft();
+        final current = await repo.loadRichProfile();
+        final today = DateTime.now();
+
+        var draftRich = current.copyWith(
           previousPregnancies: int.tryParse(_prevPreg.text.trim()),
           numberOfChildren: int.tryParse(_children.text.trim()),
           preferredMaternityHospital: emptyToNull(_hospital.text),
@@ -90,8 +108,53 @@ class _PregnancySectionPageState extends ConsumerState<PregnancySectionPage> {
           fertilityTreatment: emptyToNull(_fertility.text),
           isFirstPregnancy: _firstPregnancy,
           estimatedConceptionDate: _conception,
+          pregnancyWeekOverride: _showWeekField
+              ? int.tryParse(_week.text.trim())
+              : null,
         );
-      }),
+
+        final dates = IdentityDates(
+          lastMenstruationDate: draft.lastMenstruationDate,
+          dueDate: draft.dueDate,
+          birthDate: draft.birthDate,
+        );
+        final errors = ProfileConsistencyValidator.validate(
+          draftRich,
+          dates: dates,
+          today: today,
+        );
+        if (errors.isNotEmpty) {
+          throw ProfileValidationException(errors.first);
+        }
+
+        var reconciled = IdentityReconciler.reconcileOnStatusIntent(
+          status: _status,
+          rich: draftRich,
+          dates: dates,
+          today: today,
+        );
+        final weekInput = int.tryParse(_week.text.trim());
+        if (reconciled.rich.pregnancyStatus == PregnancyStatus.pregnant &&
+            weekInput != null &&
+            reconciled.rich.pregnancyWeekOverride != null) {
+          reconciled = IdentityReconciler.applyWeekOverrideWriteThrough(
+            week: weekInput,
+            rich: reconciled.rich,
+            dates: reconciled.dates,
+            today: today,
+          );
+        }
+        draftRich =
+            ProfileConsistencyValidator.normalizeCertaintyLists(reconciled.rich);
+
+        await repo.saveEdits(
+          ProfileEdits.fromIdentityDates(reconciled.dates),
+          today: today,
+        );
+        // saveEdits already projects status from dates; overlay editor fields.
+        await repo.saveRichProfile(draftRich);
+        ref.invalidate(userProfileSnapshotProvider);
+      },
     );
   }
 
@@ -115,13 +178,15 @@ class _PregnancySectionPageState extends ConsumerState<PregnancySectionPage> {
             labelOf: (s) => s.label,
             onChanged: (s) => setState(() => _status = s),
           ),
-          const SizedBox(height: SpacingTokens.md),
-          profileTextField(
-            fieldKey: const Key('preg_week'),
-            controller: _week,
-            label: '孕周（可选覆盖）',
-            keyboardType: TextInputType.number,
-          ),
+          if (_showWeekField) ...[
+            const SizedBox(height: SpacingTokens.md),
+            profileTextField(
+              fieldKey: const Key('preg_week'),
+              controller: _week,
+              label: '孕周（1–42，保存后写回日期）',
+              keyboardType: TextInputType.number,
+            ),
+          ],
           const SizedBox(height: SpacingTokens.md),
           Text('是否首次怀孕', style: Theme.of(context).textTheme.titleSmall),
           Row(
@@ -194,6 +259,7 @@ class _PregnancySectionPageState extends ConsumerState<PregnancySectionPage> {
               );
               if (saved == true) {
                 ref.invalidate(userProfileSnapshotProvider);
+                await _load();
               }
             },
             icon: const Icon(Icons.calendar_month_outlined),
@@ -206,11 +272,6 @@ class _PregnancySectionPageState extends ConsumerState<PregnancySectionPage> {
 }
 
 String pregnancySummary(UserProfileSnapshot snap) {
-  final r = snap.rich;
-  final bits = <String>[
-    if (r.pregnancyStatus != PregnancyStatus.unset) r.pregnancyStatus.label,
-    snap.weekLabel,
-    if (r.previousPregnancies != null) '既往${r.previousPregnancies}次',
-  ];
-  return bits.join(' · ');
+  final journey = EffectiveJourney.fromSnapshot(snap);
+  return journey.summaryWithHistory(snap.rich);
 }

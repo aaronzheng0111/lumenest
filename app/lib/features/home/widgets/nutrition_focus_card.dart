@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../domain/rich_user_profile.dart';
+import '../../../domain/effective_journey.dart';
+import '../../../domain/stage.dart';
 import '../../../domain/user_profile_snapshot.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/glass_tokens.dart';
@@ -45,14 +46,15 @@ class NutritionFocusCard extends StatelessWidget {
     if (note != null && note.isNotEmpty) return note;
     final goals = snap.rich.nutritionalGoals?.trim();
     if (goals != null && goals.isNotEmpty) return goals;
-    return switch (snap.rich.pregnancyStatus) {
-      PregnancyStatus.tryingToConceive =>
-        '备孕阶段可关注均衡膳食与叶酸来源（蔬果、全谷），量力而行。',
-      PregnancyStatus.pregnant =>
+    final journey = EffectiveJourney.fromSnapshot(snap);
+    return switch (journey.stage) {
+      Stage.prep => journey.primaryLabel == '未怀孕'
+          ? '保持规律进食与饮水，选择自己舒服的清淡搭配即可。'
+          : '备孕阶段可关注均衡膳食与叶酸来源（蔬果、全谷），量力而行。',
+      Stage.pregnant =>
         '孕期可多选择富含铁与优质蛋白的食物，少食多餐，不适就休息。',
-      PregnancyStatus.postpartum =>
+      Stage.delivery || Stage.postpartum =>
         '产后恢复期注意补水与温和营养，听从医护与自身节奏。',
-      _ => '保持规律进食与饮水，选择自己舒服的清淡搭配即可。',
     };
   }
 }

@@ -100,13 +100,18 @@ class _MedicationsSectionPageState
         return current.copyWith(
           allergies: AllergyBag(
             certainty: allergyCert,
-            medication: medication,
-            food: food,
-            environmental: environmental,
-            other: other,
+            medication: allergyCert == FieldCertainty.none
+                ? const []
+                : medication,
+            food: allergyCert == FieldCertainty.none ? const [] : food,
+            environmental: allergyCert == FieldCertainty.none
+                ? const []
+                : environmental,
+            other: allergyCert == FieldCertainty.none ? const [] : other,
           ),
           medicationsCertainty: certainty,
-          medications: meds,
+          medications:
+              certainty == FieldCertainty.none ? const <MedicationEntry>[] : meds,
         );
       }),
     );

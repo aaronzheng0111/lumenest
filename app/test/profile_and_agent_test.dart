@@ -8,8 +8,10 @@ import 'package:ai_mom_baby/data/active_user_store.dart';
 import 'package:ai_mom_baby/data/db/database_provider.dart';
 import 'package:ai_mom_baby/data/drift_conversation_repository.dart';
 import 'package:ai_mom_baby/data/drift_user_profile_repository.dart';
+import 'package:ai_mom_baby/data/user_profile_repository.dart';
 import 'package:ai_mom_baby/domain/agent_role.dart';
 import 'package:ai_mom_baby/domain/rich_user_profile.dart';
+import 'package:ai_mom_baby/domain/stage.dart';
 import 'package:ai_mom_baby/knowledge/knowledge_retriever.dart';
 import 'package:ai_mom_baby/llm/llm_types.dart';
 import 'package:ai_mom_baby/safety/safety_gate.dart';
@@ -60,9 +62,50 @@ void main() {
       expect(result.summary, contains('孕周'));
       final rich = await profiles.loadRichProfile();
       expect(rich.pregnancyStatus, PregnancyStatus.pregnant);
-      expect(rich.pregnancyWeekOverride, 12);
+      // Week override is write-through then cleared; Stage week is SSOT.
+      expect(rich.pregnancyWeekOverride, isNull);
       expect(rich.allergies.certainty, FieldCertainty.known);
       expect(rich.todayCheckIn.prenatalVitaminTaken, isTrue);
+      final snap = await profiles.getSnapshot(today: DateTime(2026, 9, 9));
+      expect(snap.stage, Stage.pregnant);
+      expect(snap.weekValue, 12);
+      expect(snap.agentArchiveLine.contains('备孕'), isFalse);
+      expect(snap.agentArchiveLine.contains('妊娠状态='), isFalse);
+    });
+
+    test('invoke trying-to-conceive clears pregnancy dates', () async {
+      final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+      await db.init();
+      addTearDown(db.close);
+      final profiles = DriftUserProfileRepository(
+        db,
+        activeUserStore: MemoryActiveUserStore(),
+      );
+      await profiles.saveEdits(
+        ProfileEdits(
+          dueDate: DateTime(2026, 12, 1),
+          lastMenstruationDate: DateTime(2026, 2, 25),
+        ),
+        today: DateTime(2026, 9, 9),
+      );
+      await profiles.saveRichProfile(
+        const RichUserProfile(
+          pregnancyStatus: PregnancyStatus.pregnant,
+          pregnancyWeekOverride: 20,
+        ),
+      );
+      final result = await UpdateProfileTool.invoke(
+        profiles: profiles,
+        userText: '我在备孕',
+        now: DateTime(2026, 9, 9),
+      );
+      expect(result.applied, isTrue);
+      final snap = await profiles.getSnapshot(today: DateTime(2026, 9, 9));
+      expect(snap.stage, Stage.prep);
+      expect(snap.dueDate, isNull);
+      expect(snap.rich.pregnancyWeekOverride, isNull);
+      expect(snap.agentArchiveLine, isNot(contains('孕20')));
+      expect(snap.weekLabel, isNot(contains('孕')));
     });
 
     test('manual and agent share same persistence', () async {

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../domain/rich_user_profile.dart';
-import '../../../domain/stage.dart';
+import '../../../domain/effective_journey.dart';
 import '../../../domain/user_profile_snapshot.dart';
 import '../../../providers.dart';
 import '../../../theme/app_colors.dart';
@@ -21,12 +20,9 @@ class MedsPendingCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final rich = snapshot.rich;
     final check = rich.todayCheckIn;
-    final vitaminPending = check.prenatalVitaminTaken != true &&
-        (rich.pregnancyStatus == PregnancyStatus.pregnant ||
-            rich.pregnancyStatus == PregnancyStatus.tryingToConceive ||
-            snapshot.stage == Stage.pregnant ||
-            snapshot.stage == Stage.prep ||
-            rich.medications.any((m) => m.isPrenatalVitamin));
+    final journey = EffectiveJourney.fromSnapshot(snapshot);
+    final vitaminPending =
+        journey.showPrenatalVitaminNudge && check.prenatalVitaminTaken != true;
 
     final pendingMeds = rich.medications
         .where((m) => !m.isPrenatalVitamin)

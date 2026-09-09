@@ -1,3 +1,4 @@
+import '../../domain/effective_journey.dart';
 import '../../domain/rich_user_profile.dart';
 import '../../domain/stage.dart';
 import '../../domain/user_profile_snapshot.dart';
@@ -25,13 +26,10 @@ enum HomeNudgeKind {
 /// Picks at most one contextual nudge from today's check-in + stage.
 HomeNudge? resolveHomeNudge(UserProfileSnapshot snapshot) {
   final check = snapshot.rich.todayCheckIn;
-  final status = snapshot.rich.pregnancyStatus;
-  final needsVitamin = status == PregnancyStatus.tryingToConceive ||
-      status == PregnancyStatus.pregnant ||
-      snapshot.stage == Stage.pregnant ||
-      snapshot.stage == Stage.prep;
+  final journey = EffectiveJourney.fromSnapshot(snapshot);
 
-  if (needsVitamin && check.prenatalVitaminTaken != true) {
+  if (journey.showPrenatalVitaminNudge &&
+      check.prenatalVitaminTaken != true) {
     return const HomeNudge(
       message: '今天的叶酸/孕维还没打卡，记得按医嘱服用哦。',
       ctaLabel: '已服用',
@@ -57,7 +55,8 @@ HomeNudge? resolveHomeNudge(UserProfileSnapshot snapshot) {
     );
   }
 
-  if (status == PregnancyStatus.unset && snapshot.stage == Stage.prep) {
+  if (journey.stage == Stage.prep &&
+      snapshot.rich.pregnancyStatus == PregnancyStatus.unset) {
     return const HomeNudge(
       message: '完善孕期状态，首页会给你更贴合的每日照护建议。',
       ctaLabel: '去档案',

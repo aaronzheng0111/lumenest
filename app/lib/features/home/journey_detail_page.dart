@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/rich_user_profile.dart';
+import '../../domain/effective_journey.dart';
 import '../../domain/stage.dart';
 import '../../domain/user_profile_snapshot.dart';
 import '../../theme/app_colors.dart';
@@ -19,7 +19,8 @@ class JourneyDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = _rows(snapshot);
+    final journey = EffectiveJourney.fromSnapshot(snapshot);
+    final rows = _rows(snapshot, journey);
     return AtmosphereBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -47,7 +48,7 @@ class JourneyDetailPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    snapshot.weekLabel,
+                    journey.primaryLabel,
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: SpacingTokens.sm),
@@ -77,27 +78,31 @@ class JourneyDetailPage extends StatelessWidget {
     );
   }
 
-  static List<(String, String)> _rows(UserProfileSnapshot snap) {
+  static List<(String, String)> _rows(
+    UserProfileSnapshot snap,
+    EffectiveJourney journey,
+  ) {
     final rich = snap.rich;
     final out = <(String, String)>[
-      ('阶段', snap.stageLabel),
-      if (rich.pregnancyStatus != PregnancyStatus.unset)
-        ('妊娠状态', rich.pregnancyStatus.label),
+      ('阶段', journey.primaryLabel),
     ];
     if (snap.lastMenstruationDate != null) {
       out.add(('末次月经', _fmt(snap.lastMenstruationDate!)));
     }
-    final due = rich.dueDateOverride ?? snap.dueDate;
-    if (due != null) out.add(('预产期', _fmt(due)));
-    if (snap.birthDate != null) out.add(('分娩日期', _fmt(snap.birthDate!)));
-    final week = rich.pregnancyWeekOverride ?? snap.weekValue;
-    if (snap.stage == Stage.pregnant && week != null) {
-      out.add(('孕周', '第$week周'));
-      final tri = rich.trimesterFromWeek(week);
-      if (tri != null) out.add(('孕期', '第$tri孕期'));
+    if (journey.dueDate != null) out.add(('预产期', _fmt(journey.dueDate!)));
+    if (journey.birthDate != null) {
+      out.add(('分娩日期', _fmt(journey.birthDate!)));
     }
-    if (snap.stage == Stage.postpartum && snap.weekValue != null) {
-      out.add(('产后周', '第${snap.weekValue}周'));
+    if (journey.stage == Stage.pregnant && journey.weekValue != null) {
+      out.add(('孕周', '第${journey.weekValue}周'));
+      if (journey.trimester != null) {
+        out.add(('孕期', '第${journey.trimester}孕期'));
+      }
+    }
+    if ((journey.stage == Stage.postpartum ||
+            journey.stage == Stage.delivery) &&
+        journey.weekValue != null) {
+      out.add(('产后周', '第${journey.weekValue}周'));
     }
     if (rich.numberOfChildren != null) {
       out.add(('子女数', '${rich.numberOfChildren}'));
@@ -119,6 +124,7 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 88,
@@ -129,7 +135,9 @@ class _DetailRow extends StatelessWidget {
                 ),
           ),
         ),
-        Expanded(child: Text(value)),
+        Expanded(
+          child: Text(value, style: Theme.of(context).textTheme.bodyLarge),
+        ),
       ],
     );
   }

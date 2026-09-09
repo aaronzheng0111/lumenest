@@ -82,11 +82,18 @@ flutter build apk --flavor dev --debug --dart-define-from-file=env/dev.json
 
 ## 模拟用户与启动隐私文案
 
-测试夹具：[`assets/fixtures/模拟用户与隐私文案.md`](assets/fixtures/模拟用户与隐私文案.md)
+本地演示默认种子 **三个时期宝妈**（启动写入 Drift，可在「我的 → 切换账号」切换）：
 
-- `mock-user.json`：冷启动首页用的模拟档案（当前孕 16 周）
-- `privacy-notice.json`：**每次启动**弹出的隐私状况页（改 JSON 即可改文案）
-- `llm_models.json`：聊天页模型下拉目录（DeepSeek / GLM / OpenAI 兼容 / 本地演示）。新增模型：追加一条 `enabled: true` 的条目（`id`、`displayName`、`provider`、`apiModelId`、可选 `baseUrlHint`、`offline`）
+| ID | 昵称 | 时期 |
+|----|------|------|
+| 1 | 晓晓·备孕 | 备孕中 |
+| 2 | 林林·孕期 | 约孕 20 周 |
+| 3 | 安安·产后 | 产后约 2 周 |
+
+说明夹具：[`assets/fixtures/mock-users.json`](assets/fixtures/mock-users.json)。日期相对「今天」计算，逻辑在 `app/lib/data/demo_moms.dart`。已有设备若只有默认「妈妈」账号，下次启动会补全 2、3，并把未改过的默认账号升为晓晓·备孕。
+
+- `privacy-notice.json`：**每次启动**弹出的隐私状况页
+- `llm_models.json`：聊天页模型下拉目录
 
 ## 文档入口
 

@@ -1,11 +1,8 @@
 {
-  "id": "mock-user-linlin",
-  "displayName": "林林",
+  "id": 2,
+  "displayName": "林林·孕期",
   "stage": "PREGNANT",
-  "weekValue": 16,
+  "weekValue": 20,
   "weekUnit": "PREGNANCY_WEEK",
-  "lmp": "2026-03-15",
-  "dueDate": "2026-12-20",
-  "city": "深圳",
-  "notes": "P1 模拟用户，仅用于本地预览与验收，不是真实档案。"
+  "notes": "兼容旧路径 AssetMockUserProfileRepository。完整三账号见 mock-users.json；Drift 启动种子以 DemoMoms 为准。"
 }

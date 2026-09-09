@@ -54,21 +54,28 @@ class TaskCardView {
 }
 
 /// Pure match (AC-10-B01 / T10-01).
+///
+/// [Stage.delivery] uses postpartum templates so 今日照护 is not empty on
+/// due-day / early confinement when birth is still missing.
 List<TaskTemplate> matchTemplates({
   required List<TaskTemplate> templates,
   required Stage stage,
   required int? weekValue,
 }) {
+  final matchStage =
+      stage == Stage.delivery ? Stage.postpartum : stage;
+  final matchWeek =
+      stage == Stage.delivery && weekValue == null ? 1 : weekValue;
   return templates.where((t) {
-    if (t.stage != stage) return false;
+    if (t.stage != matchStage) return false;
     if (t.weekMin == null && t.weekMax == null) {
       // PREP-style: stage-only match.
       return true;
     }
-    if (weekValue == null) return false;
-    final min = t.weekMin ?? weekValue;
-    final max = t.weekMax ?? weekValue;
-    return weekValue >= min && weekValue <= max;
+    if (matchWeek == null) return false;
+    final min = t.weekMin ?? matchWeek;
+    final max = t.weekMax ?? matchWeek;
+    return matchWeek >= min && matchWeek <= max;
   }).toList();
 }
 

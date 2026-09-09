@@ -21,22 +21,25 @@ void main() {
     expect(names.contains('objectbox'), isFalse);
   });
 
-  test('AC-02-B03 two inits leave a single user id=1 and FREE sub', () async {
+  test('AC-02-B03 seed creates three demo moms with FREE subs', () async {
     final provider = DriftDatabaseProvider(executor: NativeDatabase.memory());
     addTearDown(provider.close);
     await provider.init();
     await provider.init();
 
     final users = await provider.db.select(provider.db.users).get();
-    expect(users, hasLength(1));
-    expect(users.single.id, 1);
-    expect(users.single.nickname, '妈妈');
+    expect(users, hasLength(3));
+    expect(users.map((u) => u.id).toSet(), {1, 2, 3});
+    expect(users.map((u) => u.nickname).toSet(), {
+      '晓晓·备孕',
+      '林林·孕期',
+      '安安·产后',
+    });
 
     final subs = await provider.db.select(provider.db.subscriptions).get();
-    expect(subs, hasLength(1));
-    expect(subs.single.userId, 1);
-    expect(subs.single.plan, 'FREE');
-    expect(subs.single.dailyChatQuota, 1);
+    expect(subs, hasLength(3));
+    expect(subs.map((s) => s.userId).toSet(), {1, 2, 3});
+    expect(subs.every((s) => s.plan == 'FREE'), isTrue);
   });
 
   test('T02-04 insert and query messages', () async {
@@ -78,14 +81,14 @@ void main() {
       NativeDatabase.opened(sqlite, closeUnderlyingOnClose: false),
       schemaVersionOverride: 1,
     );
-    await v1.ensureSeedRows();
-    await v1.into(v1.users).insertOnConflictUpdate(
-          UsersCompanion(
+    await v1.customSelect('SELECT 1').get();
+    await v1.into(v1.users).insert(
+          UsersCompanion.insert(
             id: const Value(1),
             nickname: const Value('验收甲'),
             stage: const Value('PREP'),
-            createdAt: Value(DateTime.utc(2026, 1, 1)),
-            updatedAt: Value(DateTime.utc(2026, 1, 1)),
+            createdAt: DateTime.utc(2026, 1, 1),
+            updatedAt: DateTime.utc(2026, 1, 1),
           ),
         );
     await v1.close();

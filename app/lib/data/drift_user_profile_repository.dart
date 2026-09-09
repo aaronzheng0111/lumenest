@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
+import '../domain/identity_dates.dart';
+import '../domain/identity_reconcile.dart';
 import '../domain/rich_user_profile.dart';
 import '../domain/stage.dart';
 import '../domain/stage_resolver.dart';
@@ -9,6 +11,7 @@ import 'active_user_store.dart';
 import 'db/app_database.dart';
 import 'db/database_provider.dart';
 import 'db/domain_enums.dart';
+import 'demo_moms.dart';
 import 'user_profile_repository.dart';
 
 const kCheckBirthDateMessage = '请检查分娩日期';
@@ -54,6 +57,8 @@ class DriftUserProfileRepository implements UserProfileRepository {
           id: u.id,
           nickname: u.nickname,
           isActive: u.id == active,
+          stageLabel: StageX.fromWire(u.stage).label,
+          subtitle: DemoMoms.byId(u.id)?.blurb,
         ),
     ];
   }
@@ -234,6 +239,26 @@ class DriftUserProfileRepository implements UserProfileRepository {
         updatedAt: Value(DateTime.now().toUtc()),
       ),
     );
+
+    // Keep rich pregnancyStatus / overrides aligned with Stage SSOT.
+    final existingRich = RichUserProfile.decode(existing.profileJson);
+    final reconciled = IdentityReconciler.reconcileOnDatesChange(
+      dates: IdentityDates(
+        lastMenstruationDate: lmp,
+        dueDate: dueDate,
+        birthDate: birthDate,
+      ),
+      rich: existingRich,
+      today: day,
+    );
+    if (reconciled.rich.encode() != existingRich.encode()) {
+      await (_db.update(_db.users)..where((u) => u.id.equals(userId))).write(
+        UsersCompanion(
+          profileJson: Value(reconciled.rich.encode()),
+          updatedAt: Value(DateTime.now().toUtc()),
+        ),
+      );
+    }
   }
 
   @override

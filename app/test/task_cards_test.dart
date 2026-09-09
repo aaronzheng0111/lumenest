@@ -46,6 +46,16 @@ void main() {
     }
   });
 
+  test('DELIVERY stage should match postpartum templates', () {
+    final matched = matchTemplates(
+      templates: templates,
+      stage: Stage.delivery,
+      weekValue: null,
+    );
+    expect(matched, isNotEmpty);
+    expect(matched.every((t) => t.stage == Stage.postpartum), isTrue);
+  });
+
   test('T10-02 ensureTodayCards is idempotent', () async {
     final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
     await db.init();
