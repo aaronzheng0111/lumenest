@@ -44,4 +44,36 @@ void main() {
     final msgs = await repo.listMessages(id);
     expect(msgs.single.speakerDisplayName, '小暖');
   });
+
+  test('clearMessages removes bubbles for one conversation', () async {
+    final a = await repo.getOrCreateSolo(role: AgentRole.xiaonuan);
+    final b = await repo.getOrCreateSolo(role: AgentRole.lin);
+    await repo.insertUserMessage(conversationId: a, content: 'hi');
+    await repo.insertUserMessage(conversationId: b, content: 'doc');
+    await repo.clearMessages(a);
+    expect(await repo.listMessages(a), isEmpty);
+    expect(await repo.listMessages(b), hasLength(1));
+  });
+
+  test('clearAllMessages wipes every thread', () async {
+    final a = await repo.getOrCreateSolo(role: AgentRole.xiaonuan);
+    final g = await repo.getOrCreateGroup();
+    await repo.insertUserMessage(conversationId: a, content: 'hi');
+    await repo.insertUserMessage(conversationId: g, content: 'group');
+    await repo.clearAllMessages();
+    expect(await repo.listMessages(a), isEmpty);
+    expect(await repo.listMessages(g), isEmpty);
+  });
+
+  test('deleteMessage removes one bubble', () async {
+    final id = await repo.getOrCreateSolo(role: AgentRole.xiaonuan);
+    await repo.insertUserMessage(conversationId: id, content: 'keep');
+    await repo.insertUserMessage(conversationId: id, content: 'drop');
+    final before = await repo.listMessages(id);
+    expect(before, hasLength(2));
+    await repo.deleteMessage(before.last.id);
+    final after = await repo.listMessages(id);
+    expect(after, hasLength(1));
+    expect(after.single.content, 'keep');
+  });
 }

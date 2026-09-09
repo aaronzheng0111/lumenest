@@ -149,7 +149,10 @@ final llmConfigProvider = Provider<LlmConfig>((ref) {
   final env = LlmConfig.fromEnvironment();
   final selectedId = ref.watch(selectedLlmModelIdProvider);
   final catalog = ref.watch(llmModelCatalogProvider).valueOrNull;
-  if (catalog == null) return env;
+  if (catalog == null) {
+    // Match offline behavior before the catalog asset finishes loading.
+    return env.hasKey ? env : env.copyWith(forceOffline: true);
+  }
   return env.withModelOption(catalog.resolve(selectedId));
 });
 
@@ -197,13 +200,44 @@ final xiaonuanGraphProvider = FutureProvider<XiaonuanGraph>((ref) async {
 /// Solo-role graph (TASK-203). GROUP handoff uses [groupConsultGraphProvider].
 final agentGraphProvider =
     FutureProvider.family<XiaonuanGraph, AgentRole>((ref, role) async {
-  final safety = await ref.watch(safetyGateProvider.future);
-  final retriever = await ref.watch(knowledgeRetrieverProvider.future);
-  final prompt = await RolePrompts.load(role);
+  // Do NOT watch llmClientProvider here — catalog/model hydration recreates the
+  // client and would dispose this FutureProvider mid-await, making chat send fail.
+  SafetyGate safety;
+  try {
+    safety = await ref.watch(safetyGateProvider.future);
+  } catch (e, st) {
+    debugPrint('safetyGateProvider failed, using pass-through: $e\n$st');
+    safety = const _PassThroughSafetyGate();
+  }
+
+  KnowledgeRetriever retriever;
+  try {
+    retriever = await ref.watch(knowledgeRetrieverProvider.future);
+  } catch (e, st) {
+    debugPrint('knowledgeRetrieverProvider failed, using empty: $e\n$st');
+    retriever = FakeKnowledgeRetriever();
+  }
+
+  String prompt;
+  try {
+    prompt = await RolePrompts.load(role);
+  } catch (e, st) {
+    debugPrint('RolePrompts.load failed: $e\n$st');
+    prompt = '你是${role.displayName}';
+  }
+
+  final llmSnapshot = ref.read(llmClientProvider);
   return XiaonuanGraph(
     safety: safety,
     retriever: retriever,
-    llm: ref.watch(llmClientProvider),
+    llm: llmSnapshot,
+    resolveLlm: () {
+      try {
+        return ref.read(llmClientProvider);
+      } catch (_) {
+        return llmSnapshot;
+      }
+    },
     messages: ref.watch(conversationRepositoryProvider),
     systemPrompt: prompt,
     slicer: ref.watch(contextSlicerProvider),
@@ -216,13 +250,42 @@ final agentGraphProvider =
 final groupConsultEnabledProvider = Provider<bool>((ref) => true);
 
 final groupConsultGraphProvider = FutureProvider<GroupConsultGraph>((ref) async {
-  final safety = await ref.watch(safetyGateProvider.future);
-  final retriever = await ref.watch(knowledgeRetrieverProvider.future);
-  final rules = await loadRouterRules();
+  SafetyGate safety;
+  try {
+    safety = await ref.watch(safetyGateProvider.future);
+  } catch (e, st) {
+    debugPrint('safetyGateProvider failed, using pass-through: $e\n$st');
+    safety = const _PassThroughSafetyGate();
+  }
+
+  KnowledgeRetriever retriever;
+  try {
+    retriever = await ref.watch(knowledgeRetrieverProvider.future);
+  } catch (e, st) {
+    debugPrint('knowledgeRetrieverProvider failed, using empty: $e\n$st');
+    retriever = FakeKnowledgeRetriever();
+  }
+
+  List<RouterRule> rules;
+  try {
+    rules = await loadRouterRules();
+  } catch (e, st) {
+    debugPrint('loadRouterRules failed: $e\n$st');
+    rules = const [];
+  }
+
+  final llmSnapshot = ref.read(llmClientProvider);
   return GroupConsultGraph(
     safety: safety,
     retriever: retriever,
-    llm: ref.watch(llmClientProvider),
+    llm: llmSnapshot,
+    resolveLlm: () {
+      try {
+        return ref.read(llmClientProvider);
+      } catch (_) {
+        return llmSnapshot;
+      }
+    },
     messages: ref.watch(conversationRepositoryProvider),
     slicer: ref.watch(contextSlicerProvider),
     summaryWriter: ref.watch(summaryWriterProvider),
@@ -249,3 +312,11 @@ final todayTaskCardsProvider =
     return const [];
   }
 });
+
+/// Used when safety assets fail to load so chat can still reply offline.
+class _PassThroughSafetyGate implements SafetyGate {
+  const _PassThroughSafetyGate();
+
+  @override
+  SafetyDecision inspect(String userText) => const SafetyDecision.pass();
+}

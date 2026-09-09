@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_mom_baby/llm/dio_llm_client.dart';
+import 'package:ai_mom_baby/llm/llm_model_catalog.dart';
 import 'package:ai_mom_baby/llm/llm_types.dart';
 
 void main() {
@@ -33,6 +34,40 @@ void main() {
     );
     expect(result.status, LlmStatus.missingKey);
     expect(client.requestCount, 0);
+  });
+
+  test('REPLACE_ME placeholder is treated as missing key', () {
+    const config = LlmConfig(
+      baseUrl: 'https://example.com/v1',
+      apiKey: 'REPLACE_ME',
+      model: 'gpt-4o-mini',
+    );
+    expect(config.hasKey, isFalse);
+    expect(
+      DioLlmClient(config: config).canCallRemote,
+      isFalse,
+    );
+  });
+
+  test('remote catalog pick without key forces offline', () {
+    const env = LlmConfig(
+      baseUrl: '',
+      apiKey: '',
+      model: 'gpt-4o-mini',
+    );
+    final applied = env.withModelOption(
+      const LlmModelOption(
+        id: 'deepseek-chat',
+        displayName: 'DeepSeek',
+        provider: 'deepseek',
+        apiModelId: 'deepseek-chat',
+        baseUrlHint: 'https://api.deepseek.com',
+        enabled: true,
+        offline: false,
+      ),
+    );
+    expect(applied.forceOffline, isTrue);
+    expect(DioLlmClient(config: applied).canCallRemote, isFalse);
   });
 
   test('200 parses choices[0].message.content', () async {

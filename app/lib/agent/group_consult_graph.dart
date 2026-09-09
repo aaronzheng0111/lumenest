@@ -17,20 +17,27 @@ class GroupConsultGraph {
   GroupConsultGraph({
     required this.safety,
     required this.retriever,
-    required this.llm,
     required this.messages,
     required this.slicer,
     required this.summaryWriter,
     required this.routerRules,
+    LlmClient? llm,
+    LlmClient Function()? resolveLlm,
     this.userId = 1,
     this.promptLoader = RolePrompts.load,
     this.clock,
     this.offlineReplyDelay = const Duration(milliseconds: 650),
-  });
+  })  : assert(
+          llm != null || resolveLlm != null,
+          'Provide llm or resolveLlm',
+        ),
+        _llm = llm,
+        _resolveLlm = resolveLlm;
 
   final SafetyGate safety;
   final KnowledgeRetriever retriever;
-  final LlmClient llm;
+  final LlmClient? _llm;
+  final LlmClient Function()? _resolveLlm;
   final ConversationRepository messages;
   final ContextSlicer slicer;
   final SummaryWriter summaryWriter;
@@ -39,6 +46,8 @@ class GroupConsultGraph {
   final Future<String> Function(AgentRole role) promptLoader;
   final DateTime Function()? clock;
   final Duration offlineReplyDelay;
+
+  LlmClient get llm => _resolveLlm?.call() ?? _llm!;
 
   Future<GraphTurnResult> handle({
     required int conversationId,

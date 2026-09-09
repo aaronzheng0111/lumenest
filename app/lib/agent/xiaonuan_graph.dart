@@ -36,21 +36,29 @@ class XiaonuanGraph {
   XiaonuanGraph({
     required this.safety,
     required this.retriever,
-    required this.llm,
     required this.messages,
     required this.systemPrompt,
+    LlmClient? llm,
+    LlmClient Function()? resolveLlm,
     ContextSlicer? slicer,
     SummaryWriter? summaryWriter,
     this.userId = 1,
     this.speaker = AgentRole.xiaonuan,
     this.clock,
     this.offlineReplyDelay = const Duration(milliseconds: 650),
-  })  : slicer = slicer ?? EmptyContextSlicer(),
+  })  : assert(
+          llm != null || resolveLlm != null,
+          'Provide llm or resolveLlm',
+        ),
+        _llm = llm,
+        _resolveLlm = resolveLlm,
+        slicer = slicer ?? EmptyContextSlicer(),
         summaryWriter = summaryWriter ?? NoopSummaryWriter();
 
   final SafetyGate safety;
   final KnowledgeRetriever retriever;
-  final LlmClient llm;
+  final LlmClient? _llm;
+  final LlmClient Function()? _resolveLlm;
   final ConversationRepository messages;
   final String systemPrompt;
   final ContextSlicer slicer;
@@ -63,6 +71,9 @@ class XiaonuanGraph {
 
   /// Artificial pause so the chat typing animation is visible in offline mode.
   final Duration offlineReplyDelay;
+
+  /// Prefer [resolveLlm] so Riverpod model switches do not dispose this graph mid-turn.
+  LlmClient get llm => _resolveLlm?.call() ?? _llm!;
 
   static const assetPromptPath =
       'assets/fixtures/prompts/xiaonuan_system_prompt.txt';

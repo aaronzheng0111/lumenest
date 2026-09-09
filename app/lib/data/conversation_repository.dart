@@ -74,4 +74,13 @@ abstract class ConversationRepository {
   });
 
   Future<List<ConversationListItem>> listConversations();
+
+  /// Deletes all messages in one conversation (bubbles gone; session row kept).
+  Future<void> clearMessages(int conversationId);
+
+  /// Deletes every message for the local user (all solo + group threads).
+  Future<void> clearAllMessages();
+
+  /// Deletes a single message by id (ChatGPT-style per-bubble delete).
+  Future<void> deleteMessage(int messageId);
 }

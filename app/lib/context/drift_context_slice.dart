@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../data/conversation_repository.dart';
 import '../data/db/app_database.dart';
@@ -36,16 +37,32 @@ class DriftContextSlicer implements ContextSlicer {
     required int userId,
     required int conversationId,
   }) async {
-    final snapshot = await _profiles.getSnapshot();
-    final habits = await _loadHabits(userId);
-    final summaries = await _loadSummaries(userId);
-    final promptBlock = buildPromptBlock(
-      snapshot: snapshot,
-      habitsText: habits,
-      summariesText: summaries,
-    );
-    final recent = await _loadRecentTurns(conversationId);
-    return ContextSlice(promptBlock: promptBlock, recentTurns: recent);
+    try {
+      final snapshot = await _profiles.getSnapshot();
+      final habits = await _loadHabits(userId);
+      final summaries = await _loadSummaries(userId);
+      final promptBlock = buildPromptBlock(
+        snapshot: snapshot,
+        habitsText: habits,
+        summariesText: summaries,
+      );
+      final recent = await _loadRecentTurns(conversationId);
+      return ContextSlice(promptBlock: promptBlock, recentTurns: recent);
+    } catch (e, st) {
+      debugPrint('DriftContextSlicer.build failed: $e\n$st');
+      List<ChatMessageWire> recent = const [];
+      try {
+        recent = await _loadRecentTurns(conversationId);
+      } catch (_) {}
+      return ContextSlice(
+        promptBlock: buildPromptBlock(
+          snapshot: UserProfileSnapshot.fallback,
+          habitsText: '无',
+          summariesText: '无',
+        ),
+        recentTurns: recent,
+      );
+    }
   }
 
   Future<String> _loadHabits(int userId) async {

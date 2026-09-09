@@ -66,9 +66,11 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
         _loading = false;
       });
       _scrollToEnd();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('group chat bootstrap failed: $e\n$st');
       if (!mounted) return;
       setState(() => _loading = false);
+      _showSnack(AppCopy.chatSessionNotReady);
     }
   }
 
@@ -92,24 +94,31 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
     });
   }
 
+  void _showSnack(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   Future<void> _send() async {
     if (_sending) return;
     final privacy = await ref.read(privacyStoreProvider).isAccepted();
     if (!privacy) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppCopy.privacyRequiredToChat)),
-      );
+      _showSnack(AppCopy.privacyRequiredToChat);
       return;
     }
 
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     if (text.length > 2000) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppCopy.maxMessageLength)),
-      );
+      _showSnack(AppCopy.maxMessageLength);
       return;
     }
 
@@ -121,7 +130,10 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
     _lastSendAt = now;
 
     final conversationId = _conversationId;
-    if (conversationId == null) return;
+    if (conversationId == null) {
+      _showSnack(AppCopy.chatSessionNotReady);
+      return;
+    }
 
     setState(() {
       _sending = true;
@@ -156,6 +168,9 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
         _scrollToEnd();
       }
       ref.invalidate(conversationListProvider);
+    } catch (e, st) {
+      debugPrint('group chat send failed: $e\n$st');
+      _showSnack(AppCopy.chatSendFailed);
     } finally {
       if (mounted) {
         setState(() {
@@ -164,6 +179,54 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
         });
       }
     }
+  }
+
+  Future<void> _clearThisChat() async {
+    final id = _conversationId;
+    if (id == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(AppCopy.clearThisChat),
+        content: const Text(AppCopy.clearThisChatConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(AppCopy.privacyClose),
+          ),
+          TextButton(
+            key: const Key('confirm_clear_this_chat'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(AppCopy.clearThisChat),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await ref.read(conversationRepositoryProvider).clearMessages(id);
+    await ChatDraftStore.save(id, '');
+    _controller.clear();
+    if (!mounted) return;
+    setState(() {
+      _messages = [];
+      _revealMessageId = null;
+    });
+    ref.invalidate(conversationListProvider);
+    _showSnack(AppCopy.clearChatHistoryDone);
+  }
+
+  Future<void> _deleteMessage(ChatMessage message) async {
+    await ref.read(conversationRepositoryProvider).deleteMessage(message.id);
+    final id = _conversationId;
+    if (id == null || !mounted) return;
+    final msgs = await ref.read(conversationRepositoryProvider).listMessages(id);
+    if (!mounted) return;
+    setState(() {
+      _messages = msgs;
+      if (_revealMessageId == message.id) _revealMessageId = null;
+    });
+    ref.invalidate(conversationListProvider);
+    _showSnack(AppCopy.messageDeleted);
   }
 
   @override
@@ -182,6 +245,14 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: [
+          IconButton(
+            key: const Key('chat_clear'),
+            tooltip: AppCopy.clearThisChat,
+            icon: const Icon(Icons.delete_sweep_outlined),
+            onPressed: _sending ? null : _clearThisChat,
+          ),
+        ],
       ),
       body: AtmosphereBackground(
         child: Column(
@@ -205,6 +276,7 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
                         return ChatBubble(
                           message: msg,
                           animateReveal: msg.id == _revealMessageId,
+                          onDeleted: () => _deleteMessage(msg),
                         );
                       },
                     ),

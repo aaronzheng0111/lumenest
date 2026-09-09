@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../agent/offline_default_reply.dart';
+import '../../agent/tools/get_current_time_tool.dart';
+import '../../agent/xiaonuan_graph.dart';
 import '../../app_copy.dart';
 import '../../data/conversation_repository.dart';
 import '../../domain/agent_role.dart';
@@ -73,9 +76,11 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
         _loading = false;
       });
       _scrollToEnd();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('chat bootstrap failed: $e\n$st');
       if (!mounted) return;
       setState(() => _loading = false);
+      _showSnack(AppCopy.chatSessionNotReady);
     }
   }
 
@@ -99,24 +104,31 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
     });
   }
 
+  void _showSnack(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   Future<void> _send() async {
     if (_locked || _sending) return;
     final privacy = await ref.read(privacyStoreProvider).isAccepted();
     if (!privacy) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppCopy.privacyRequiredToChat)),
-      );
+      _showSnack(AppCopy.privacyRequiredToChat);
       return;
     }
 
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     if (text.length > 2000) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppCopy.maxMessageLength)),
-      );
+      _showSnack(AppCopy.maxMessageLength);
       return;
     }
 
@@ -128,7 +140,10 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
     _lastSendAt = now;
 
     final conversationId = _conversationId;
-    if (conversationId == null) return;
+    if (conversationId == null) {
+      _showSnack(AppCopy.chatSessionNotReady);
+      return;
+    }
 
     setState(() {
       _sending = true;
@@ -149,11 +164,36 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
         _scrollToEnd();
       }
 
-      final graph = await ref.read(agentGraphProvider(widget.role).future);
-      final turn = await graph.handle(
-        conversationId: conversationId,
-        userText: text,
-      );
+      GraphTurnResult turn;
+      try {
+        final graph = await _loadSoloGraph();
+        turn = await graph.handle(
+          conversationId: conversationId,
+          userText: text,
+        );
+      } catch (e, st) {
+        debugPrint('chat graph failed, using offline fallback: $e\n$st');
+        final fallback = OfflineDefaultReply.build(
+          speaker: widget.role,
+          userText: text,
+          currentTime: GetCurrentTimeTool.shouldInvoke(text)
+              ? GetCurrentTimeTool.invoke()
+              : null,
+        );
+        final id = await repo.insertAssistantMessage(
+          conversationId: conversationId,
+          content: fallback,
+          speaker: widget.role,
+        );
+        turn = GraphTurnResult(
+          assistantContent: fallback,
+          blockedBySafety: false,
+          llmCalls: 0,
+          assistantMessageId: id,
+          usedOfflineDefault: true,
+        );
+      }
+
       final afterAssistant = await repo.listMessages(conversationId);
       if (mounted) {
         setState(() {
@@ -162,6 +202,10 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
         });
         _scrollToEnd();
       }
+    } catch (e, st) {
+      debugPrint('chat send failed: $e\n$st');
+      _showSnack('${AppCopy.chatSendFailed}（$e）');
+
     } finally {
       if (mounted) {
         setState(() {
@@ -170,6 +214,65 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
         });
       }
     }
+  }
+
+  Future<XiaonuanGraph> _loadSoloGraph() async {
+    final provider = agentGraphProvider(widget.role);
+    try {
+      return await ref.read(provider.future);
+    } catch (e, st) {
+      debugPrint('agentGraphProvider failed, retrying once: $e\n$st');
+      ref.invalidate(provider);
+      return ref.read(provider.future);
+    }
+  }
+
+  Future<void> _clearThisChat() async {
+    final id = _conversationId;
+    if (id == null || _locked) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(AppCopy.clearThisChat),
+        content: const Text(AppCopy.clearThisChatConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(AppCopy.privacyClose),
+          ),
+          TextButton(
+            key: const Key('confirm_clear_this_chat'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(AppCopy.clearThisChat),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await ref.read(conversationRepositoryProvider).clearMessages(id);
+    await ChatDraftStore.save(id, '');
+    _controller.clear();
+    if (!mounted) return;
+    setState(() {
+      _messages = [];
+      _revealMessageId = null;
+    });
+    ref.invalidate(conversationListProvider);
+    _showSnack(AppCopy.clearChatHistoryDone);
+  }
+
+  Future<void> _deleteMessage(ChatMessage message) async {
+    await ref.read(conversationRepositoryProvider).deleteMessage(message.id);
+    final id = _conversationId;
+    if (id == null || !mounted) return;
+    final msgs = await ref.read(conversationRepositoryProvider).listMessages(id);
+    if (!mounted) return;
+    setState(() {
+      _messages = msgs;
+      if (_revealMessageId == message.id) _revealMessageId = null;
+    });
+    ref.invalidate(conversationListProvider);
+    _showSnack(AppCopy.messageDeleted);
   }
 
   @override
@@ -188,19 +291,26 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: [
+          if (!_locked)
+            IconButton(
+              key: const Key('chat_clear'),
+              tooltip: AppCopy.clearThisChat,
+              icon: const Icon(Icons.delete_sweep_outlined),
+              onPressed: _sending ? null : _clearThisChat,
+            ),
+        ],
       ),
       body: AtmosphereBackground(
         child: Column(
           children: [
-            SizedBox(height: topInset),
-            const LlmModelPickerBar(),
             if (_locked)
               Padding(
-                padding: const EdgeInsets.fromLTRB(
+                padding: EdgeInsets.fromLTRB(
+                  SpacingTokens.pageMargin,
+                  topInset,
                   SpacingTokens.pageMargin,
                   0,
-                  SpacingTokens.pageMargin,
-                  SpacingTokens.sm,
                 ),
                 child: GlassContainer(
                   fill: GlassFill.roseSoft,
@@ -212,7 +322,10 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
-              ),
+              )
+            else
+              SizedBox(height: topInset),
+            if (!_locked) const LlmModelPickerBar(),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
@@ -230,6 +343,7 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
                         return ChatBubble(
                           message: msg,
                           animateReveal: msg.id == _revealMessageId,
+                          onDeleted: () => _deleteMessage(msg),
                         );
                       },
                     ),
@@ -257,6 +371,10 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
                         enabled: !_locked && !_sending,
                         minLines: 1,
                         maxLines: 4,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) {
+                          if (!_locked && !_sending) _send();
+                        },
                         decoration: InputDecoration(
                           border: InputBorder.none,
                           hintText: _locked

@@ -75,6 +75,13 @@ class MeInfoPage extends ConsumerWidget {
                 ),
                 const Divider(indent: 56),
                 _MeTile(
+                  tileKey: const Key('me_clear_chat'),
+                  icon: Icons.chat_bubble_outline_rounded,
+                  title: AppCopy.clearChatHistory,
+                  onTap: () => _clearChatHistory(context, ref),
+                ),
+                const Divider(indent: 56),
+                _MeTile(
                   tileKey: const Key('me_clear_summaries'),
                   icon: Icons.history_toggle_off_rounded,
                   title: AppCopy.clearSummaries,
@@ -119,6 +126,43 @@ class MeInfoPage extends ConsumerWidget {
     if (ok == true) {
       await ref.read(privacyStoreProvider).setAccepted(false);
       ref.invalidate(privacyAcceptedProvider);
+      try {
+        await ref.read(conversationRepositoryProvider).clearAllMessages();
+        await ref.read(summaryWriterProvider).clearSummaries(userId: 1);
+      } catch (e) {
+        debugPrint('wipe on delete failed: $e');
+      }
+      ref.invalidate(conversationListProvider);
+    }
+  }
+
+  Future<void> _clearChatHistory(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(AppCopy.clearChatHistory),
+        content: const Text(AppCopy.clearChatHistoryConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(AppCopy.privacyClose),
+          ),
+          TextButton(
+            key: const Key('confirm_clear_chat'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(AppCopy.clearChatHistory),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(conversationRepositoryProvider).clearAllMessages();
+      ref.invalidate(conversationListProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppCopy.clearChatHistoryDone)),
+        );
+      }
     }
   }
 

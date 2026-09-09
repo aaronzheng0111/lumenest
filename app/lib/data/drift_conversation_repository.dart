@@ -146,6 +146,23 @@ class DriftConversationRepository implements ConversationRepository {
     return items;
   }
 
+  @override
+  Future<void> clearMessages(int conversationId) async {
+    await (_db.delete(_db.messages)
+          ..where((m) => m.conversationId.equals(conversationId)))
+        .go();
+  }
+
+  @override
+  Future<void> clearAllMessages() async {
+    await _db.delete(_db.messages).go();
+  }
+
+  @override
+  Future<void> deleteMessage(int messageId) async {
+    await (_db.delete(_db.messages)..where((m) => m.id.equals(messageId))).go();
+  }
+
   ChatMessage _toMessage(Message row) {
     var safety = false;
     var sources = <String>[];

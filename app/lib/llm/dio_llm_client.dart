@@ -31,7 +31,19 @@ class LlmConfig {
   /// When true (e.g. 「本地演示」), skip remote calls even if a key is set.
   final bool forceOffline;
 
-  bool get hasKey => apiKey.trim().isNotEmpty;
+  bool get hasKey {
+    final k = apiKey.trim();
+    if (k.isEmpty) return false;
+    // Common placeholder values from env/dev.json.example must not count as configured.
+    const placeholders = {
+      'REPLACE_ME',
+      'your_api_key',
+      'YOUR_API_KEY',
+      'changeme',
+    };
+    return !placeholders.contains(k);
+  }
+
   bool get hasBaseUrl => baseUrl.trim().isNotEmpty;
 
   LlmConfig copyWith({
@@ -50,8 +62,9 @@ class LlmConfig {
 
   /// Applies a catalog selection. Runtime [apiModelId] overrides `LLM_MODEL`.
   /// [baseUrlHint] fills in only when env `LLM_BASE_URL` is empty.
+  /// Remote picks without a real API key fall back to offline demo replies.
   LlmConfig withModelOption(LlmModelOption option) {
-    if (option.offline) {
+    if (option.offline || !hasKey) {
       return copyWith(forceOffline: true);
     }
     final hint = option.baseUrlHint?.trim() ?? '';
