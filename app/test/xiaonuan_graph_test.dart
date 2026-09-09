@@ -105,6 +105,9 @@ class _CountingLlm implements LlmClient {
   List<ChatMessageWire>? lastMessages;
 
   @override
+  bool get canCallRemote => true;
+
+  @override
   Future<LlmResult> complete({
     required List<ChatMessageWire> messages,
     required String requestId,

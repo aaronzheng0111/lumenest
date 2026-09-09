@@ -57,11 +57,14 @@ class DioLlmClient implements LlmClient {
   int requestCount = 0;
 
   @override
+  bool get canCallRemote => config.hasKey && config.hasBaseUrl;
+
+  @override
   Future<LlmResult> complete({
     required List<ChatMessageWire> messages,
     required String requestId,
   }) async {
-    if (!config.hasKey || !config.hasBaseUrl) {
+    if (!canCallRemote) {
       _safeLog('llm missingKey requestId=$requestId');
       return const LlmResult(status: LlmStatus.missingKey);
     }

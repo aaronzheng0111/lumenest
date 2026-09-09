@@ -1,28 +1,41 @@
 import '../domain/agent_role.dart';
 
-/// Tools an agent may invoke (AC-11-B03).
+/// Tools an agent may invoke (AC-11-B03 + local demo tools).
 enum AgentTool {
   retrieveKb,
   readContext,
   crisisTemplate,
   upsertHabit,
   toggleTask,
+
+  /// Wall-clock time — safe for all roles; used to exercise tool wiring.
+  getCurrentTime,
 }
 
 /// Static ACL table — unauthorized calls must be rejected by the graph.
 abstract final class ToolAcl {
   static const Map<AgentRole, Set<AgentTool>> allowed = {
-    AgentRole.xiaonuan: {AgentTool.retrieveKb, AgentTool.readContext},
-    AgentRole.lin: {AgentTool.retrieveKb, AgentTool.readContext},
+    AgentRole.xiaonuan: {
+      AgentTool.retrieveKb,
+      AgentTool.readContext,
+      AgentTool.getCurrentTime,
+    },
+    AgentRole.lin: {
+      AgentTool.retrieveKb,
+      AgentTool.readContext,
+      AgentTool.getCurrentTime,
+    },
     AgentRole.suxin: {
       AgentTool.readContext,
       AgentTool.crisisTemplate,
       AgentTool.retrieveKb,
+      AgentTool.getCurrentTime,
     },
     AgentRole.ama: {
       AgentTool.retrieveKb,
       AgentTool.upsertHabit,
       AgentTool.toggleTask,
+      AgentTool.getCurrentTime,
     },
   };
 

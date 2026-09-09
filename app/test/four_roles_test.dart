@@ -39,6 +39,7 @@ void main() {
     expect(ToolAcl.canUse(AgentRole.suxin, AgentTool.crisisTemplate), isTrue);
     expect(ToolAcl.canUse(AgentRole.ama, AgentTool.toggleTask), isTrue);
     expect(ToolAcl.canUse(AgentRole.ama, AgentTool.crisisTemplate), isFalse);
+    expect(ToolAcl.canUse(AgentRole.xiaonuan, AgentTool.getCurrentTime), isTrue);
     expect(ToolAcl.suxinMayUseChunk('kb-emotion-01'), isTrue);
     expect(ToolAcl.suxinMayUseChunk('kb-nausea-01'), isFalse);
   });

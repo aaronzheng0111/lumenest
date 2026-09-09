@@ -13,6 +13,7 @@ import '../../widgets/atmosphere_background.dart';
 import '../../widgets/glass/glass_app_bar.dart';
 import '../../widgets/glass/glass_container.dart';
 import 'chat_bubble.dart';
+import 'chat_typing_indicator.dart';
 
 /// GROUP consult session (AC-11-F02 / F03).
 class GroupChatSessionPage extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
   bool _loading = true;
   bool _sending = false;
   bool _awaitingReply = false;
+  int? _revealMessageId;
   DateTime? _lastSendAt;
 
   @override
@@ -143,10 +145,16 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
       }
 
       final graph = await ref.read(groupConsultGraphProvider.future);
-      await graph.handle(conversationId: conversationId, userText: text);
+      final turn = await graph.handle(
+        conversationId: conversationId,
+        userText: text,
+      );
       final afterAssistant = await repo.listMessages(conversationId);
       if (mounted) {
-        setState(() => _messages = afterAssistant);
+        setState(() {
+          _messages = afterAssistant;
+          _revealMessageId = turn.assistantMessageId;
+        });
         _scrollToEnd();
       }
       ref.invalidate(conversationListProvider);
@@ -192,19 +200,13 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
                       itemCount: _messages.length + (_awaitingReply ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (_awaitingReply && index == _messages.length) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              AppCopy.llmLoading,
-                              key: const Key('chat_loading'),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: AppColors.onSurfaceVariant),
-                            ),
-                          );
+                          return const ChatTypingIndicator();
                         }
-                        return ChatBubble(message: _messages[index]);
+                        final msg = _messages[index];
+                        return ChatBubble(
+                          message: msg,
+                          animateReveal: msg.id == _revealMessageId,
+                        );
                       },
                     ),
             ),

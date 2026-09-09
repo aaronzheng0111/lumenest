@@ -9,9 +9,16 @@ import '../../theme/spacing_tokens.dart';
 import '../../widgets/glass/glass_container.dart';
 
 class ChatBubble extends StatelessWidget {
-  const ChatBubble({super.key, required this.message});
+  const ChatBubble({
+    super.key,
+    required this.message,
+    this.animateReveal = false,
+  });
 
   final ChatMessage message;
+
+  /// When true, assistant text types out once (new offline/remote replies).
+  final bool animateReveal;
 
   @override
   Widget build(BuildContext context) {
@@ -81,10 +88,16 @@ class ChatBubble extends StatelessWidget {
                   horizontal: SpacingTokens.md,
                   vertical: SpacingTokens.sm,
                 ),
-                child: Text(
-                  message.content,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                child: animateReveal && !isUser
+                    ? _TypewriterText(
+                        key: ValueKey('type_${message.id}'),
+                        text: message.content,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      )
+                    : Text(
+                        message.content,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
               ),
             ),
           ),
@@ -118,6 +131,56 @@ class ChatBubble extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _TypewriterText extends StatefulWidget {
+  const _TypewriterText({
+    super.key,
+    required this.text,
+    this.style,
+  });
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<_TypewriterText> createState() => _TypewriterTextState();
+}
+
+class _TypewriterTextState extends State<_TypewriterText>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final chars = widget.text.characters.length;
+    final ms = (280 + chars * 18).clamp(280, 1600);
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: ms),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final chars = widget.text.characters;
+        final count =
+            (chars.length * _controller.value).ceil().clamp(0, chars.length);
+        final visible = chars.take(count).toString();
+        return Text(visible, style: widget.style);
+      },
     );
   }
 }

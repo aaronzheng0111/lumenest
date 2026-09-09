@@ -52,6 +52,9 @@ abstract final class LlmUserCopy {
 }
 
 abstract class LlmClient {
+  /// When false, the agent graph uses [OfflineDefaultReply] instead of remote LLM.
+  bool get canCallRemote => true;
+
   Future<LlmResult> complete({
     required List<ChatMessageWire> messages,
     required String requestId,

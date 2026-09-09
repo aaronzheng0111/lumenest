@@ -7,7 +7,9 @@ import '../domain/agent_role.dart';
 import '../knowledge/knowledge_retriever.dart';
 import '../llm/llm_types.dart';
 import '../safety/safety_gate.dart';
+import 'offline_default_reply.dart';
 import 'tool_acl.dart';
+import 'tools/get_current_time_tool.dart';
 
 class GraphTurnResult {
   const GraphTurnResult({
@@ -16,6 +18,8 @@ class GraphTurnResult {
     required this.llmCalls,
     this.sourceTitles = const [],
     this.assistantMessageId,
+    this.toolsUsed = const [],
+    this.usedOfflineDefault = false,
   });
 
   final String assistantContent;
@@ -23,9 +27,11 @@ class GraphTurnResult {
   final int llmCalls;
   final List<String> sourceTitles;
   final int? assistantMessageId;
+  final List<AgentTool> toolsUsed;
+  final bool usedOfflineDefault;
 }
 
-/// Hard-coded P1 graph: Safety → retrieve → context → LLM(0|1) → persist → summary.
+/// Hard-coded P1 graph: Safety → retrieve → tools → context → LLM|offline → persist → summary.
 class XiaonuanGraph {
   XiaonuanGraph({
     required this.safety,
@@ -37,6 +43,8 @@ class XiaonuanGraph {
     SummaryWriter? summaryWriter,
     this.userId = 1,
     this.speaker = AgentRole.xiaonuan,
+    this.clock,
+    this.offlineReplyDelay = const Duration(milliseconds: 650),
   })  : slicer = slicer ?? EmptyContextSlicer(),
         summaryWriter = summaryWriter ?? NoopSummaryWriter();
 
@@ -49,6 +57,12 @@ class XiaonuanGraph {
   final SummaryWriter summaryWriter;
   final int userId;
   final AgentRole speaker;
+
+  /// Injectable clock for [GetCurrentTimeTool] (tests).
+  final DateTime Function()? clock;
+
+  /// Artificial pause so the chat typing animation is visible in offline mode.
+  final Duration offlineReplyDelay;
 
   static const assetPromptPath =
       'assets/fixtures/prompts/xiaonuan_system_prompt.txt';
@@ -82,6 +96,9 @@ class XiaonuanGraph {
 
     final hits = await _retrieveForRole(userText);
     final sources = hits.map((h) => h.title).take(3).toList();
+    final toolsUsed = <AgentTool>[];
+    final timeResult = _maybeRunCurrentTime(userText, toolsUsed);
+
     final slice = await slicer.build(
       userId: userId,
       conversationId: conversationId,
@@ -95,23 +112,52 @@ class XiaonuanGraph {
       }
       system = '$system$buf';
     }
+    if (timeResult != null) {
+      system = '$system\n【工具】${GetCurrentTimeTool.name}=$timeResult';
+    }
 
-    final wireMessages = <ChatMessageWire>[
-      ChatMessageWire(role: 'system', content: system),
-      ...slice.recentTurns,
-      ChatMessageWire(role: 'user', content: userText),
-    ];
+    final String content;
+    final int llmCalls;
+    final bool usedOffline;
+    final bool writeSummary;
 
-    final result = await llm.complete(
-      messages: wireMessages,
-      requestId: _requestId(),
-    );
+    if (!llm.canCallRemote) {
+      if (offlineReplyDelay > Duration.zero) {
+        await Future<void>.delayed(offlineReplyDelay);
+      }
+      content = OfflineDefaultReply.build(
+        speaker: speaker,
+        userText: userText,
+        currentTime: timeResult,
+      );
+      llmCalls = 0;
+      usedOffline = true;
+      writeSummary = false;
+    } else {
+      final wireMessages = <ChatMessageWire>[
+        ChatMessageWire(role: 'system', content: system),
+        ...slice.recentTurns,
+        ChatMessageWire(role: 'user', content: userText),
+      ];
 
-    final content = switch (result.status) {
-      LlmStatus.ok => result.content ?? LlmUserCopy.retryLater,
-      LlmStatus.missingKey => LlmUserCopy.missingKey,
-      _ => LlmUserCopy.retryLater,
-    };
+      final result = await llm.complete(
+        messages: wireMessages,
+        requestId: _requestId(),
+      );
+
+      content = switch (result.status) {
+        LlmStatus.ok => result.content ?? LlmUserCopy.retryLater,
+        LlmStatus.missingKey => OfflineDefaultReply.build(
+            speaker: speaker,
+            userText: userText,
+            currentTime: timeResult,
+          ),
+        _ => LlmUserCopy.retryLater,
+      };
+      llmCalls = 1;
+      usedOffline = result.status == LlmStatus.missingKey;
+      writeSummary = result.status == LlmStatus.ok && result.content != null;
+    }
 
     final id = await messages.insertAssistantMessage(
       conversationId: conversationId,
@@ -120,8 +166,7 @@ class XiaonuanGraph {
       sourceTitles: sources,
     );
 
-    if (result.status == LlmStatus.ok && result.content != null) {
-      // Fire-and-forget style write; await so tests can observe.
+    if (writeSummary) {
       await summaryWriter.writeTurnSummary(
         userId: userId,
         assistantContent: content,
@@ -132,10 +177,19 @@ class XiaonuanGraph {
     return GraphTurnResult(
       assistantContent: content,
       blockedBySafety: false,
-      llmCalls: 1,
+      llmCalls: llmCalls,
       sourceTitles: sources,
       assistantMessageId: id,
+      toolsUsed: toolsUsed,
+      usedOfflineDefault: usedOffline,
     );
+  }
+
+  String? _maybeRunCurrentTime(String userText, List<AgentTool> toolsUsed) {
+    if (!ToolAcl.canUse(speaker, AgentTool.getCurrentTime)) return null;
+    if (!GetCurrentTimeTool.shouldInvoke(userText)) return null;
+    toolsUsed.add(AgentTool.getCurrentTime);
+    return GetCurrentTimeTool.invoke(now: clock?.call());
   }
 
   Future<List<KnowledgeHit>> _retrieveForRole(String userText) async {

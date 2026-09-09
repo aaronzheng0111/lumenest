@@ -6,8 +6,10 @@ import '../knowledge/knowledge_retriever.dart';
 import '../llm/llm_types.dart';
 import '../safety/safety_gate.dart';
 import 'next_speaker.dart';
+import 'offline_default_reply.dart';
 import 'role_prompts.dart';
 import 'tool_acl.dart';
+import 'tools/get_current_time_tool.dart';
 import 'xiaonuan_graph.dart';
 
 /// GROUP turn: Safety → route → 1–2 LLM speakers → persist (AC-11-B04/B05).
@@ -22,6 +24,8 @@ class GroupConsultGraph {
     required this.routerRules,
     this.userId = 1,
     this.promptLoader = RolePrompts.load,
+    this.clock,
+    this.offlineReplyDelay = const Duration(milliseconds: 650),
   });
 
   final SafetyGate safety;
@@ -33,6 +37,8 @@ class GroupConsultGraph {
   final List<RouterRule> routerRules;
   final int userId;
   final Future<String> Function(AgentRole role) promptLoader;
+  final DateTime Function()? clock;
+  final Duration offlineReplyDelay;
 
   Future<GraphTurnResult> handle({
     required int conversationId,
@@ -77,7 +83,14 @@ class GroupConsultGraph {
     String? lastContent;
     int? lastId;
     final allSources = <String>[];
+    final toolsUsed = <AgentTool>[];
+    var usedOffline = false;
     String? previousRef;
+    final timeResult = _maybeRunCurrentTime(
+      speakers.isEmpty ? AgentRole.xiaonuan : speakers.first,
+      userText,
+      toolsUsed,
+    );
 
     for (final speaker in speakers.take(2)) {
       final prompt = await promptLoader(speaker);
@@ -93,25 +106,51 @@ class GroupConsultGraph {
         }
         system = '$system$buf';
       }
+      if (timeResult != null) {
+        system = '$system\n【工具】${GetCurrentTimeTool.name}=$timeResult';
+      }
       if (previousRef != null) {
         system = '$system\n【上一助手】$previousRef';
       }
 
-      final result = await llm.complete(
-        messages: [
-          ChatMessageWire(role: 'system', content: system),
-          ...slice.recentTurns,
-          ChatMessageWire(role: 'user', content: userText),
-        ],
-        requestId: 'grp-${speaker.wireId}-${DateTime.now().microsecondsSinceEpoch}',
-      );
-      llmCalls++;
+      final String content;
+      final bool writeSummary;
 
-      final content = switch (result.status) {
-        LlmStatus.ok => result.content ?? LlmUserCopy.retryLater,
-        LlmStatus.missingKey => LlmUserCopy.missingKey,
-        _ => LlmUserCopy.retryLater,
-      };
+      if (!llm.canCallRemote) {
+        if (offlineReplyDelay > Duration.zero) {
+          await Future<void>.delayed(offlineReplyDelay);
+        }
+        content = OfflineDefaultReply.build(
+          speaker: speaker,
+          userText: userText,
+          currentTime: timeResult,
+        );
+        usedOffline = true;
+        writeSummary = false;
+      } else {
+        final result = await llm.complete(
+          messages: [
+            ChatMessageWire(role: 'system', content: system),
+            ...slice.recentTurns,
+            ChatMessageWire(role: 'user', content: userText),
+          ],
+          requestId:
+              'grp-${speaker.wireId}-${DateTime.now().microsecondsSinceEpoch}',
+        );
+        llmCalls++;
+
+        content = switch (result.status) {
+          LlmStatus.ok => result.content ?? LlmUserCopy.retryLater,
+          LlmStatus.missingKey => OfflineDefaultReply.build(
+              speaker: speaker,
+              userText: userText,
+              currentTime: timeResult,
+            ),
+          _ => LlmUserCopy.retryLater,
+        };
+        if (result.status == LlmStatus.missingKey) usedOffline = true;
+        writeSummary = result.status == LlmStatus.ok && result.content != null;
+      }
       lastContent = content;
 
       final handoffRef = speakers.length > 1
@@ -124,9 +163,10 @@ class GroupConsultGraph {
         sourceTitles: sources,
         agentReplyRef: handoffRef,
       );
-      previousRef = '${speaker.displayName}: ${content.length > 40 ? content.substring(0, 40) : content}';
+      previousRef =
+          '${speaker.displayName}: ${content.length > 40 ? content.substring(0, 40) : content}';
 
-      if (result.status == LlmStatus.ok && result.content != null) {
+      if (writeSummary) {
         await summaryWriter.writeTurnSummary(
           userId: userId,
           assistantContent: content,
@@ -141,7 +181,20 @@ class GroupConsultGraph {
       llmCalls: llmCalls,
       sourceTitles: allSources.take(3).toList(),
       assistantMessageId: lastId,
+      toolsUsed: toolsUsed,
+      usedOfflineDefault: usedOffline,
     );
+  }
+
+  String? _maybeRunCurrentTime(
+    AgentRole speaker,
+    String userText,
+    List<AgentTool> toolsUsed,
+  ) {
+    if (!ToolAcl.canUse(speaker, AgentTool.getCurrentTime)) return null;
+    if (!GetCurrentTimeTool.shouldInvoke(userText)) return null;
+    toolsUsed.add(AgentTool.getCurrentTime);
+    return GetCurrentTimeTool.invoke(now: clock?.call());
   }
 
   Future<List<KnowledgeHit>> _retrieveForRole(
