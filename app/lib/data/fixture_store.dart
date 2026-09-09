@@ -93,4 +93,36 @@ class AssetMockUserProfileRepository implements UserProfileRepository {
     _rich = transform(_rich);
     return _rich;
   }
+
+  @override
+  Future<RichUserProfile> updateTodayCheckIn(
+    DailyCheckIn Function(DailyCheckIn current) patch, {
+    DateTime? now,
+    String? eventCategory,
+    String? eventSummary,
+    String? eventRawRef,
+  }) async {
+    final day = now ?? DateTime.now();
+    final checkDay = DateTime(day.year, day.month, day.day);
+    return updateRichProfile((current) {
+      var check = current.todayCheckIn;
+      final d = check.localDate;
+      final sameDay = d != null &&
+          d.year == checkDay.year &&
+          d.month == checkDay.month &&
+          d.day == checkDay.day;
+      if (!sameDay) {
+        check = DailyCheckIn(localDate: checkDay);
+      }
+      return current.copyWith(todayCheckIn: patch(check));
+    });
+  }
+
+  @override
+  Future<void> logWellnessEvent({
+    required String category,
+    required String summary,
+    String? rawRef,
+    DateTime? now,
+  }) async {}
 }

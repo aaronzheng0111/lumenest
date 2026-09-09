@@ -123,6 +123,9 @@ class DriftUserProfileRepository implements UserProfileRepository {
       userId: userId,
       nickname: user.nickname,
       rich: RichUserProfile.decode(user.profileJson),
+      lastMenstruationDate: user.lastMenstruationDate,
+      dueDate: user.dueDate,
+      birthDate: user.birthDate,
     );
   }
 
@@ -264,6 +267,72 @@ class DriftUserProfileRepository implements UserProfileRepository {
     }
     await saveRichProfile(next);
     return next;
+  }
+
+  @override
+  Future<RichUserProfile> updateTodayCheckIn(
+    DailyCheckIn Function(DailyCheckIn current) patch, {
+    DateTime? now,
+    String? eventCategory,
+    String? eventSummary,
+    String? eventRawRef,
+  }) async {
+    final day = now ?? DateTime.now();
+    final checkDay = DateTime(day.year, day.month, day.day);
+    final next = await updateRichProfile((current) {
+      var check = current.todayCheckIn;
+      if (!_sameCalendarDay(check.localDate, checkDay)) {
+        check = DailyCheckIn(localDate: checkDay);
+      } else if (check.localDate == null) {
+        check = check.copyWith(localDate: checkDay);
+      }
+      return current.copyWith(todayCheckIn: patch(check));
+    });
+    if (eventCategory != null &&
+        eventSummary != null &&
+        eventSummary.trim().isNotEmpty) {
+      await logWellnessEvent(
+        category: eventCategory,
+        summary: eventSummary.trim(),
+        rawRef: eventRawRef,
+        now: day,
+      );
+    }
+    return next;
+  }
+
+  @override
+  Future<void> logWellnessEvent({
+    required String category,
+    required String summary,
+    String? rawRef,
+    DateTime? now,
+  }) async {
+    final day = calendarDay(now ?? DateTime.now());
+    final userId = await _resolveUserId();
+    await refresh(day, userId: userId);
+    final user = await (_db.select(_db.users)..where((u) => u.id.equals(userId)))
+        .getSingle();
+    final stage = StageX.fromWire(user.stage);
+    final weekValue = _weekValueFor(stage, user);
+    final weekUnit = _weekUnitFor(stage, user) ?? WeekUnitWire.pregnancyWeek;
+    final weekStart = day.subtract(Duration(days: day.weekday - 1));
+    await _db.into(_db.profileEvents).insert(
+          ProfileEventsCompanion.insert(
+            userId: userId,
+            weekStart: weekStart,
+            weekValue: weekValue ?? 0,
+            weekUnit: weekUnit,
+            category: category,
+            summary: summary,
+            rawRef: Value(rawRef),
+          ),
+        );
+  }
+
+  static bool _sameCalendarDay(DateTime? a, DateTime b) {
+    if (a == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   void _validateBirthDate({

@@ -54,7 +54,7 @@ Future<void> _pumpApp(
 }
 
 void main() {
-  testWidgets('AC-01-F01 home shows stage, week, four roles, task teaser',
+  testWidgets('AC-01-F01 home shows stage, week, four roles, care module',
       (tester) async {
     await _pumpApp(tester);
     expect(find.text('备孕'), findsOneWidget);
@@ -63,7 +63,10 @@ void main() {
     expect(find.text('林医生'), findsOneWidget);
     expect(find.text('苏心'), findsOneWidget);
     expect(find.text('阿嬷'), findsOneWidget);
+    expect(find.text('今日照护'), findsOneWidget);
     expect(find.text(AppCopy.noTasksToday), findsOneWidget);
+    expect(find.byKey(const Key('hydration_module')), findsOneWidget);
+    expect(find.byKey(const Key('health_snapshot_strip')), findsOneWidget);
   });
 
   testWidgets('AC-01-F01 pregnant week copy', (tester) async {
@@ -83,6 +86,12 @@ void main() {
   testWidgets('AC-01-F02 xiaonuan opens /chat?role=XIAONUAN', (tester) async {
     final observer = _RouteRecorder();
     await _pumpApp(tester, observers: [observer]);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('role_XIAONUAN')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('role_XIAONUAN')));
     await tester.pumpAndSettle();
     expect(observer.names.last, '/chat?role=XIAONUAN');
@@ -94,6 +103,12 @@ void main() {
       (tester) async {
     final observer = _RouteRecorder();
     await _pumpApp(tester, observers: [observer]);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('role_LIN')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('role_LIN')));
     await tester.pumpAndSettle();
     expect(observer.names.last, '/chat?role=LIN');
@@ -191,6 +206,12 @@ void main() {
   testWidgets('AC-16-F01 chat send blocked until privacy accepted',
       (tester) async {
     await _pumpApp(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('role_XIAONUAN')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('role_XIAONUAN')));
     await tester.pumpAndSettle();
     // Bootstrap may snack when DB isn't ready in widget tests; clear so send is hittable.

@@ -88,4 +88,24 @@ abstract class UserProfileRepository {
   Future<RichUserProfile> updateRichProfile(
     RichUserProfile Function(RichUserProfile current) transform,
   );
+
+  /// Shared write path for Home / Me / chat: patch today's [DailyCheckIn].
+  ///
+  /// Resets the strip when [localDate] is a different calendar day.
+  /// Optionally appends a [ProfileEvents] habit/mood row for lightweight trends.
+  Future<RichUserProfile> updateTodayCheckIn(
+    DailyCheckIn Function(DailyCheckIn current) patch, {
+    DateTime? now,
+    String? eventCategory,
+    String? eventSummary,
+    String? eventRawRef,
+  });
+
+  /// Logs a symptom / habit event without changing today's check-in strip.
+  Future<void> logWellnessEvent({
+    required String category,
+    required String summary,
+    String? rawRef,
+    DateTime? now,
+  });
 }

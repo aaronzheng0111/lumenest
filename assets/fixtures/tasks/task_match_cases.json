@@ -1,8 +1,9 @@
 {
   "cases": [
-    {"stage": "PREP", "weekValue": null, "expectIds": ["prep-water"]},
-    {"stage": "PREGNANT", "weekValue": 16, "expectIds": ["preg-walk"]},
-    {"stage": "PREGNANT", "weekValue": 8, "expectIds": []},
-    {"stage": "POSTPARTUM", "weekValue": 3, "expectIds": ["post-rest"]}
+    {"stage": "PREP", "weekValue": null, "expectIds": ["prep-water", "prep-vitamin", "prep-mood", "prep-walk"]},
+    {"stage": "PREGNANT", "weekValue": 16, "expectIds": ["preg-water", "preg-vitamin", "preg-mood", "preg-walk"]},
+    {"stage": "PREGNANT", "weekValue": 8, "expectIds": ["preg-water", "preg-vitamin", "preg-mood"]},
+    {"stage": "PREGNANT", "weekValue": 30, "expectIds": ["preg-water", "preg-vitamin", "preg-mood", "preg-walk", "preg-kick"]},
+    {"stage": "POSTPARTUM", "weekValue": 3, "expectIds": ["post-water", "post-rest", "post-mood", "post-walk"]}
   ]
 }

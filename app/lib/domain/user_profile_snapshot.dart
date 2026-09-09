@@ -10,6 +10,9 @@ final class UserProfileSnapshot {
     this.userId = 1,
     this.nickname = '妈妈',
     this.rich = const RichUserProfile(),
+    this.lastMenstruationDate,
+    this.dueDate,
+    this.birthDate,
   });
 
   final Stage stage;
@@ -21,6 +24,11 @@ final class UserProfileSnapshot {
   final int userId;
   final String nickname;
   final RichUserProfile rich;
+
+  /// Calendar dates from the users row (for journey / cycle UI only).
+  final DateTime? lastMenstruationDate;
+  final DateTime? dueDate;
+  final DateTime? birthDate;
 
   static const UserProfileSnapshot fallback = UserProfileSnapshot(
     stage: Stage.prep,

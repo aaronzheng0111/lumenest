@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../../domain/agent_role.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/glass_tokens.dart';
+import '../../theme/radius_tokens.dart';
 import '../../theme/spacing_tokens.dart';
 import '../../widgets/glass/glass_container.dart';
 
+/// Compact horizontal role entry (secondary to Chat tab).
 class RoleEntryGrid extends StatelessWidget {
   const RoleEntryGrid({super.key, required this.onSelect});
 
@@ -20,27 +22,35 @@ class RoleEntryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      key: const Key('role_grid'),
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: SpacingTokens.md,
-      crossAxisSpacing: SpacingTokens.md,
-      childAspectRatio: 1.15,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final role in order)
-          _RoleCard(
-            role: role,
-            onTap: () => onSelect(role),
+        Text('和谁聊聊', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: SpacingTokens.sm),
+        SizedBox(
+          height: 88,
+          child: ListView.separated(
+            key: const Key('role_grid'),
+            scrollDirection: Axis.horizontal,
+            itemCount: order.length,
+            separatorBuilder: (_, __) =>
+                const SizedBox(width: SpacingTokens.sm),
+            itemBuilder: (context, index) {
+              final role = order[index];
+              return _CompactRoleChip(
+                role: role,
+                onTap: () => onSelect(role),
+              );
+            },
           ),
+        ),
       ],
     );
   }
 }
 
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({required this.role, required this.onTap});
+class _CompactRoleChip extends StatelessWidget {
+  const _CompactRoleChip({required this.role, required this.onTap});
 
   final AgentRole role;
   final VoidCallback onTap;
@@ -54,8 +64,13 @@ class _RoleCard extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: GlassContainer(
+          width: 72,
           fill: unlocked ? GlassFill.rose : GlassFill.locked,
-          padding: const EdgeInsets.all(SpacingTokens.md),
+          borderRadius: RadiusTokens.borderLg,
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.sm,
+            vertical: SpacingTokens.sm,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -65,11 +80,11 @@ class _RoleCard extends StatelessWidget {
                   ClipOval(
                     child: Image.asset(
                       role.avatarAsset,
-                      width: 48,
-                      height: 48,
+                      width: 36,
+                      height: 36,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => CircleAvatar(
-                        radius: 24,
+                        radius: 18,
                         backgroundColor: AppColors.secondary,
                         child: Text(role.displayName.substring(0, 1)),
                       ),
@@ -78,16 +93,18 @@ class _RoleCard extends StatelessWidget {
                   if (!unlocked)
                     const Icon(
                       Icons.lock_rounded,
-                      size: 16,
+                      size: 12,
                       color: AppColors.locked,
                     ),
                 ],
               ),
-              const SizedBox(height: SpacingTokens.sm),
+              const SizedBox(height: SpacingTokens.xs),
               Text(
                 role.displayName,
                 key: Key('role_${role.wireId}'),
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: unlocked
                           ? AppColors.onSurface
                           : AppColors.locked,

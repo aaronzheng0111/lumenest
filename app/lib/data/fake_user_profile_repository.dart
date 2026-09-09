@@ -111,6 +111,56 @@ class FakeUserProfileRepository implements UserProfileRepository {
     await saveRichProfile(next);
     return next;
   }
+
+  final List<({String category, String summary, String? rawRef})> wellnessEvents =
+      [];
+
+  @override
+  Future<RichUserProfile> updateTodayCheckIn(
+    DailyCheckIn Function(DailyCheckIn current) patch, {
+    DateTime? now,
+    String? eventCategory,
+    String? eventSummary,
+    String? eventRawRef,
+  }) async {
+    final day = now ?? DateTime.now();
+    final checkDay = DateTime(day.year, day.month, day.day);
+    final next = await updateRichProfile((current) {
+      var check = current.todayCheckIn;
+      final d = check.localDate;
+      final sameDay = d != null &&
+          d.year == checkDay.year &&
+          d.month == checkDay.month &&
+          d.day == checkDay.day;
+      if (!sameDay) {
+        check = DailyCheckIn(localDate: checkDay);
+      } else if (check.localDate == null) {
+        check = check.copyWith(localDate: checkDay);
+      }
+      return current.copyWith(todayCheckIn: patch(check));
+    });
+    if (eventCategory != null &&
+        eventSummary != null &&
+        eventSummary.trim().isNotEmpty) {
+      await logWellnessEvent(
+        category: eventCategory,
+        summary: eventSummary.trim(),
+        rawRef: eventRawRef,
+        now: day,
+      );
+    }
+    return next;
+  }
+
+  @override
+  Future<void> logWellnessEvent({
+    required String category,
+    required String summary,
+    String? rawRef,
+    DateTime? now,
+  }) async {
+    wellnessEvents.add((category: category, summary: summary, rawRef: rawRef));
+  }
 }
 
 extension on UserProfileSnapshot {
@@ -121,5 +171,8 @@ extension on UserProfileSnapshot {
         userId: userId,
         nickname: nickname,
         rich: r,
+        lastMenstruationDate: lastMenstruationDate,
+        dueDate: dueDate,
+        birthDate: birthDate,
       );
 }

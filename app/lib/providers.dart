@@ -15,6 +15,7 @@ import 'data/drift_user_profile_repository.dart';
 import 'data/privacy_store.dart';
 import 'data/user_profile_repository.dart';
 import 'domain/agent_role.dart';
+import 'domain/rich_user_profile.dart';
 import 'domain/user_profile_snapshot.dart';
 import 'knowledge/knowledge_retriever.dart';
 import 'chat/chat_suggestions_catalog.dart';
@@ -419,6 +420,119 @@ final todayTaskCardsProvider =
     return const [];
   }
 });
+
+/// Home / Me / chat shared mutations for [DailyCheckIn].
+final homeCheckInControllerProvider = Provider<HomeCheckInController>((ref) {
+  return HomeCheckInController(ref);
+});
+
+class HomeCheckInController {
+  HomeCheckInController(this._ref);
+
+  final Ref _ref;
+
+  UserProfileRepository get _profiles =>
+      _ref.read(userProfileRepositoryProvider);
+
+  Future<void> _refresh() async {
+    _ref.invalidate(userProfileSnapshotProvider);
+  }
+
+  Future<void> addWaterMl(double ml) async {
+    if (ml <= 0) return;
+    await _profiles.updateTodayCheckIn(
+      (c) => c.copyWith(waterMl: (c.waterMl ?? 0) + ml),
+      eventCategory: 'HABIT',
+      eventSummary: '饮水 +${ml.round()}ml',
+      eventRawRef: '{"type":"water","deltaMl":$ml}',
+    );
+    await _refresh();
+  }
+
+  Future<void> setWaterMl(double? ml) async {
+    await _profiles.updateTodayCheckIn(
+      (c) => c.copyWith(waterMl: ml),
+      eventCategory: ml == null ? null : 'HABIT',
+      eventSummary: ml == null ? null : '饮水设为 ${ml.round()}ml',
+      eventRawRef: ml == null ? null : '{"type":"water","setMl":$ml}',
+    );
+    await _refresh();
+  }
+
+  Future<void> setMood(String? mood) async {
+    final label = mood?.trim();
+    await _profiles.updateTodayCheckIn(
+      (c) => c.copyWith(mood: label),
+      eventCategory: label == null || label.isEmpty ? null : 'MOOD',
+      eventSummary: label == null || label.isEmpty ? null : '心情：$label',
+      eventRawRef: label == null || label.isEmpty
+          ? null
+          : '{"type":"mood"}',
+    );
+    await _refresh();
+  }
+
+  Future<void> setPrenatalVitaminTaken(bool taken) async {
+    await _profiles.updateTodayCheckIn(
+      (c) => c.copyWith(prenatalVitaminTaken: taken),
+      eventCategory: 'HABIT',
+      eventSummary: taken ? '已服孕维/叶酸' : '取消孕维打卡',
+      eventRawRef: '{"type":"prenatalVitamin","taken":$taken}',
+    );
+    await _refresh();
+  }
+
+  Future<void> setSleepHours(double? hours) async {
+    await _profiles.updateTodayCheckIn(
+      (c) => c.copyWith(sleepHours: hours),
+      eventCategory: hours == null ? null : 'HABIT',
+      eventSummary: hours == null ? null : '睡眠 ${hours}h',
+      eventRawRef: hours == null ? null : '{"type":"sleep","hours":$hours}',
+    );
+    await _refresh();
+  }
+
+  Future<void> setWeightKg(double? kg) async {
+    await _profiles.updateTodayCheckIn(
+      (c) => c.copyWith(weightKg: kg),
+      eventCategory: kg == null ? null : 'HABIT',
+      eventSummary: kg == null ? null : '体重 ${kg}kg',
+      eventRawRef: kg == null ? null : '{"type":"weight","kg":$kg}',
+    );
+    if (kg != null) {
+      await _profiles.updateRichProfile(
+        (current) => current.copyWith(currentWeightKg: kg),
+      );
+    }
+    await _refresh();
+  }
+
+  Future<void> saveSymptomLog(SymptomLog log) async {
+    await _profiles.updateRichProfile(
+      (current) => current.copyWith(latestSymptoms: log),
+    );
+    await _profiles.logWellnessEvent(
+      category: 'SYMPTOM',
+      summary: _symptomSummary(log),
+      rawRef: '{"type":"symptom"}',
+    );
+    await _refresh();
+  }
+
+  static String _symptomSummary(SymptomLog log) {
+    final bits = <String>[
+      if (log.nausea != null) '恶心',
+      if (log.fatigue != null) '疲劳',
+      if (log.headache != null) '头痛',
+      if (log.backPain != null) '背痛',
+      if (log.heartburn != null) '烧心',
+      if (log.swelling != null) '水肿',
+      if (log.mood != null) '情绪',
+      if (log.sleepQuality != null) '睡眠',
+    ];
+    return bits.isEmpty ? '记录了不适感受' : '不适：${bits.join("、")}';
+  }
+}
 
 /// Used when safety assets fail to load so chat can still reply offline.
 class _PassThroughSafetyGate implements SafetyGate {

@@ -162,7 +162,9 @@ components:
 
 **孕育小家** is an 18-month pregnancy companion (备孕 → 孕期 → 产后). The product feeling is *warm companionship*, not clinical tooling: soft, calm, premium—Apple **Liquid Glass** language on Android.
 
-Personality: nurturing, quiet confidence, breathable space. Hierarchy comes from **frosted layers** (atmosphere → glass content → floating chrome), not heavy Material cards. Information architecture stays fixed: Home / Chat / Me; four AI roles (小暖 active; 林医生 / 苏心 / 阿嬷 locked in P1).
+Personality: nurturing, quiet confidence, breathable space. Hierarchy comes from **frosted layers** (atmosphere → glass content → floating chrome), not heavy Material cards. Information architecture stays fixed: **Home / Chat / Me** (三栏底栏 only — do not add Journey/Track/Agent tabs); four AI roles (小暖 active; 林医生 / 苏心 / 阿嬷 locked in P1).
+
+**Home = daily care dashboard** (journey hero, hydration, mood/health snapshot, today’s care tasks, compact role entry, light agent nudge). **Chat** remains the primary AI companion entry. **Me** holds profile, lifestyle check-in sync, and privacy.
 
 Motion is springy and short—float, press, sheet blur—not decorative noise.
 

@@ -1,7 +1,17 @@
 {
   "templates": [
     {"id": "prep-water", "stage": "PREP", "weekMin": null, "weekMax": null, "title": "喝水打卡", "body": "今天喝够8杯水（习惯，非医嘱）"},
+    {"id": "prep-vitamin", "stage": "PREP", "weekMin": null, "weekMax": null, "title": "叶酸/备孕维", "body": "按医嘱服用，忘记就补记一下"},
+    {"id": "prep-mood", "stage": "PREP", "weekMin": null, "weekMax": null, "title": "心情打卡", "body": "用一句话记下今天的情绪"},
+    {"id": "prep-walk", "stage": "PREP", "weekMin": null, "weekMax": null, "title": "轻松散步", "body": "身体允许再进行，不舒服就停下"},
+    {"id": "preg-water", "stage": "PREGNANT", "weekMin": 1, "weekMax": 42, "title": "喝水打卡", "body": "少量多次补水（习惯，非医嘱）"},
+    {"id": "preg-vitamin", "stage": "PREGNANT", "weekMin": 1, "weekMax": 42, "title": "孕维/叶酸", "body": "按医嘱服用，此处仅作本地提醒"},
+    {"id": "preg-mood", "stage": "PREGNANT", "weekMin": 1, "weekMax": 42, "title": "心情打卡", "body": "记录情绪有助自我觉察"},
     {"id": "preg-walk", "stage": "PREGNANT", "weekMin": 12, "weekMax": 32, "title": "散步15分钟", "body": "身体允许再进行，不舒服就停下"},
-    {"id": "post-rest", "stage": "POSTPARTUM", "weekMin": 1, "weekMax": 6, "title": "午休30分钟", "body": "能躺则躺，寻求家人分担"}
+    {"id": "preg-kick", "stage": "PREGNANT", "weekMin": 28, "weekMax": 42, "title": "留意胎动", "body": "异常减少请联系医护，勿自行诊断"},
+    {"id": "post-water", "stage": "POSTPARTUM", "weekMin": 1, "weekMax": 12, "title": "喝水打卡", "body": "哺乳或恢复期尤其注意补水"},
+    {"id": "post-rest", "stage": "POSTPARTUM", "weekMin": 1, "weekMax": 6, "title": "午休30分钟", "body": "能躺则躺，寻求家人分担"},
+    {"id": "post-mood", "stage": "POSTPARTUM", "weekMin": 1, "weekMax": 12, "title": "心情打卡", "body": "情绪起伏很常见，严重时请求助专业支持"},
+    {"id": "post-walk", "stage": "POSTPARTUM", "weekMin": 2, "weekMax": 12, "title": "温和散步", "body": "遵医嘱活动，量力而行"}
   ]
 }
