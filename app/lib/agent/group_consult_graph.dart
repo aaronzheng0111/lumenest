@@ -102,8 +102,12 @@ class GroupConsultGraph {
       userText,
       toolsUsed,
     );
+    // Group write-back is Xiaonuan-only (orchestra), even if ToolAcl allows
+    // specialists in solo. Specialist-only rounds (e.g. @林医生) skip profile.
     final profileResult = await _maybeUpdateProfile(
-      speakers.isEmpty ? AgentRole.xiaonuan : speakers.first,
+      speakers.isEmpty || speakers.contains(AgentRole.xiaonuan)
+          ? AgentRole.xiaonuan
+          : speakers.first,
       userText,
       toolsUsed,
     );
@@ -137,10 +141,7 @@ class GroupConsultGraph {
       allSources.addAll(sources);
 
       var system = '$prompt\n${slice.promptBlock}';
-      system = '$system\n【会诊身份】你当前角色是「${speaker.displayName}」。'
-          '开场与回答必须明确以该身份自居；严禁声称自己是其他角色'
-          '（例如角色不是小暖时，不得自称小暖）。'
-          '历史消息里带姓名前缀的是其他会诊成员说的话，仅作参考，不要冒充。';
+      system = '$system\n${_groupIdentityBlock(speaker, speakerList)}';
       if (hits.isNotEmpty) {
         final buf = StringBuffer('\n【本地资料】\n');
         for (final h in hits) {
@@ -151,7 +152,8 @@ class GroupConsultGraph {
       if (timeResult != null) {
         system = '$system\n【工具】${GetCurrentTimeTool.name}=$timeResult';
       }
-      if (profileResult != null) {
+      // Only tell Xiaonuan about profile tool outcomes (avoid specialist echo).
+      if (profileResult != null && speaker == AgentRole.xiaonuan) {
         system =
             '$system\n【工具】${UpdateProfileTool.name}=${profileResult.summary}';
       }
@@ -167,8 +169,14 @@ class GroupConsultGraph {
           speaker: speaker,
           userText: userText,
           currentTime: timeResult,
-          profileUpdateSummary:
-              profileResult?.applied == true ? profileResult!.summary : null,
+          profileUpdateSummary: speaker == AgentRole.xiaonuan &&
+                  profileResult?.applied == true
+              ? profileResult!.summary
+              : null,
+          profileProposeSummary: speaker == AgentRole.xiaonuan &&
+                  profileResult?.proposeOnly == true
+              ? profileResult!.summary
+              : null,
         );
         usedOffline = true;
         writeSummary = false;
@@ -194,7 +202,12 @@ class GroupConsultGraph {
               speaker: speaker,
               userText: userText,
               currentTime: timeResult,
-              profileUpdateSummary: profileResult?.applied == true
+              profileUpdateSummary: speaker == AgentRole.xiaonuan &&
+                      profileResult?.applied == true
+                  ? profileResult!.summary
+                  : null,
+              profileProposeSummary: speaker == AgentRole.xiaonuan &&
+                      profileResult?.proposeOnly == true
                   ? profileResult!.summary
                   : null,
             ),
@@ -258,6 +271,33 @@ class GroupConsultGraph {
     return GetCurrentTimeTool.invoke(now: clock?.call());
   }
 
+  /// Short per-turn identity / orchestra boundaries (not baked into role txt).
+  static String _groupIdentityBlock(
+    AgentRole speaker,
+    List<AgentRole> speakerList,
+  ) {
+    final hasSpecialist = speakerList.any((r) => r != AgentRole.xiaonuan);
+    final buf = StringBuffer(
+      '【会诊身份】你当前角色是「${speaker.displayName}」。'
+      '只以本身份自居；严禁冒充其他角色'
+      '（例如不是小暖时不得自称小暖）。'
+      '历史消息里带姓名前缀的是其他会诊成员说的话，仅作参考。',
+    );
+    if (speaker == AgentRole.xiaonuan && hasSpecialist) {
+      final next = speakerList.firstWhere((r) => r != AgentRole.xiaonuan);
+      buf.write(
+        '你是编排者：先接住用户，点名下一位「${next.displayName}」，'
+        '并明确告诉用户本轮「以${next.displayName}为准」。',
+      );
+    } else if (speaker != AgentRole.xiaonuan) {
+      buf.write(
+        '你是专科补充：只答本职领域；不要宣称已改档案；'
+        '不要重新分配发言权或点名下一位。',
+      );
+    }
+    return buf.toString();
+  }
+
   Future<ProfileToolResult?> _maybeUpdateProfile(
     AgentRole speaker,
     String userText,
@@ -265,6 +305,8 @@ class GroupConsultGraph {
   ) async {
     final repo = profiles;
     if (repo == null) return null;
+    // Boundary: group profile write-back only for Xiaonuan (orchestra).
+    if (speaker != AgentRole.xiaonuan) return null;
     if (!ToolAcl.canUse(speaker, AgentTool.updateProfile)) return null;
     if (!UpdateProfileTool.shouldInvoke(userText)) return null;
     final result = await UpdateProfileTool.invoke(
@@ -272,9 +314,12 @@ class GroupConsultGraph {
       userText: userText,
       now: clock?.call(),
     );
-    if (!result.applied) return null;
-    toolsUsed.add(AgentTool.updateProfile);
-    return result;
+    if (result.applied) {
+      toolsUsed.add(AgentTool.updateProfile);
+      return result;
+    }
+    if (result.proposeOnly) return result;
+    return null;
   }
 
   Future<List<KnowledgeHit>> _retrieveForRole(

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../agent/tool_acl.dart';
 import '../../app_copy.dart';
 import '../../chat/chat_suggestions_catalog.dart';
+import '../../data/chat_composer_media_controller.dart';
 import '../../data/conversation_repository.dart';
 import '../../domain/agent_role.dart';
 import '../../providers.dart';
@@ -29,6 +30,7 @@ class GroupChatSessionPage extends ConsumerStatefulWidget {
 class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
+  late final ChatComposerMediaController _media;
   int? _conversationId;
   List<ChatMessage> _messages = [];
   bool _loading = true;
@@ -41,20 +43,28 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
   AgentRole? _streamingSpeaker;
 
   bool get _showSuggestions =>
-      !_loading &&
-      !_sending &&
-      _messages.isEmpty &&
-      _conversationId != null;
+      !_loading && !_sending && _messages.isEmpty && _conversationId != null;
 
   @override
   void initState() {
     super.initState();
+    _media = createChatComposerMediaController(
+      picker: ref.read(chatAttachmentPickerProvider),
+      store: ref.read(chatMediaStoreProvider),
+    );
+    _media.addListener(_onMediaChanged);
     _bootstrap();
+  }
+
+  void _onMediaChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _persistDraft();
+    _media.removeListener(_onMediaChanged);
+    _media.dispose();
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
@@ -132,20 +142,60 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
     await _send();
   }
 
-  Future<void> _send() async {
+  Future<void> _attachFiles() async {
     if (_sending) return;
+    final result = await _media.attachFiles();
+    switch (result) {
+      case ChatMediaAttachResult.tooLarge:
+        _showSnack(AppCopy.attachmentTooLarge);
+      case ChatMediaAttachResult.tooMany:
+        _showSnack(AppCopy.tooManyAttachments);
+      case ChatMediaAttachResult.ok:
+      case ChatMediaAttachResult.cancelled:
+      case ChatMediaAttachResult.busy:
+        break;
+    }
+  }
+
+  Future<void> _toggleVoice() async {
+    if (_sending) return;
+    final result = await _media.toggleVoice();
+    switch (result) {
+      case ChatVoiceToggleResult.readyToSend:
+        if (_controller.text.trim().isEmpty) {
+          await _send();
+        }
+      case ChatVoiceToggleResult.tooShort:
+        _showSnack(AppCopy.voiceTooShort);
+      case ChatVoiceToggleResult.tooLarge:
+        _showSnack(AppCopy.attachmentTooLarge);
+      case ChatVoiceToggleResult.tooMany:
+        _showSnack(AppCopy.tooManyAttachments);
+      case ChatVoiceToggleResult.permissionDenied:
+        _showSnack(AppCopy.voicePermissionDenied);
+      case ChatVoiceToggleResult.failed:
+        _showSnack(AppCopy.voiceFailed);
+      case ChatVoiceToggleResult.started:
+      case ChatVoiceToggleResult.busy:
+        break;
+    }
+  }
+
+  Future<void> _send() async {
+    if (_sending || _media.isRecording) return;
     final privacy = await ref.read(privacyStoreProvider).isAccepted();
     if (!privacy) {
       _showSnack(AppCopy.privacyRequiredToChat);
       return;
     }
 
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    if (text.length > 2000) {
+    if (!_media.canSend(_controller.text)) return;
+    final outgoing = _media.takeOutgoing(_controller.text);
+    if (outgoing.content.length > 2000) {
       _showSnack(AppCopy.maxMessageLength);
       return;
     }
+    final text = outgoing.content;
 
     final now = DateTime.now();
     if (_lastSendAt != null &&
@@ -181,6 +231,7 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
       await repo.insertUserMessage(
         conversationId: conversationId,
         content: text,
+        mediaRef: outgoing.mediaRef,
       );
       final afterUser = await repo.listMessages(conversationId);
       if (mounted) {
@@ -284,7 +335,8 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
     await ref.read(conversationRepositoryProvider).deleteMessage(message.id);
     final id = _conversationId;
     if (id == null || !mounted) return;
-    final msgs = await ref.read(conversationRepositoryProvider).listMessages(id);
+    final msgs =
+        await ref.read(conversationRepositoryProvider).listMessages(id);
     if (!mounted) return;
     setState(() {
       _messages = msgs;
@@ -387,6 +439,11 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
                 showSuggestions: _showSuggestions && suggestions.isNotEmpty,
                 suggestedPrompts: suggestions,
                 onSuggestionSelected: _applySuggestion,
+                pendingMedia: _media.pending,
+                isRecording: _media.isRecording,
+                onAttach: _attachFiles,
+                onToggleVoice: _toggleVoice,
+                onRemoveMedia: _media.removePending,
               ),
             ),
           ],

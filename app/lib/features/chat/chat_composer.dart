@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app_copy.dart';
+import '../../chat/chat_media.dart';
 import '../../domain/agent_role.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/glass_tokens.dart';
@@ -13,7 +15,7 @@ import 'chat_mention_query.dart';
 import 'chat_mention_roles.dart';
 import 'chat_suggested_prompts.dart';
 
-/// Shared chat input: optional suggestions, @mention picker, glass composer.
+/// Shared chat input: suggestions, @mentions, attachments, voice, glass composer.
 class ChatComposer extends StatefulWidget {
   const ChatComposer({
     super.key,
@@ -28,6 +30,11 @@ class ChatComposer extends StatefulWidget {
     this.suggestedPrompts = const [],
     this.onSuggestionSelected,
     this.textInputAction = TextInputAction.send,
+    this.pendingMedia = const [],
+    this.isRecording = false,
+    this.onAttach,
+    this.onToggleVoice,
+    this.onRemoveMedia,
   });
 
   final TextEditingController controller;
@@ -45,6 +52,12 @@ class ChatComposer extends StatefulWidget {
   final List<String> suggestedPrompts;
   final ValueChanged<String>? onSuggestionSelected;
   final TextInputAction textInputAction;
+
+  final List<ChatMediaItem> pendingMedia;
+  final bool isRecording;
+  final VoidCallback? onAttach;
+  final VoidCallback? onToggleVoice;
+  final ValueChanged<String>? onRemoveMedia;
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -153,8 +166,11 @@ class _ChatComposerState extends State<ChatComposer> {
 
   @override
   Widget build(BuildContext context) {
-    final showPicker =
-        widget.enableMentions && _activeMention != null && _filteredRoles.isNotEmpty;
+    final showPicker = widget.enableMentions &&
+        _activeMention != null &&
+        _filteredRoles.isNotEmpty;
+    final showMediaActions =
+        widget.onAttach != null || widget.onToggleVoice != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -172,15 +188,60 @@ class _ChatComposerState extends State<ChatComposer> {
             roles: _filteredRoles,
             onSelected: _insertMention,
           ),
+        if (widget.pendingMedia.isNotEmpty)
+          _PendingMediaStrip(
+            items: widget.pendingMedia,
+            enabled: widget.enabled,
+            onRemove: widget.onRemoveMedia,
+          ),
+        if (widget.isRecording)
+          Padding(
+            padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                AppCopy.recordingVoice,
+                key: const Key('chat_recording_label'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.primaryDeep,
+                    ),
+              ),
+            ),
+          ),
         GlassContainer(
           fill: GlassFill.medium,
           borderRadius: RadiusTokens.borderPill,
           padding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.lg,
+            horizontal: SpacingTokens.sm,
             vertical: SpacingTokens.sm,
           ),
           child: Row(
             children: [
+              if (showMediaActions) ...[
+                if (widget.onAttach != null)
+                  IconButton(
+                    key: const Key('chat_attach'),
+                    tooltip: AppCopy.attachFile,
+                    onPressed: widget.enabled ? widget.onAttach : null,
+                    icon: const Icon(Icons.attach_file_rounded),
+                    color: AppColors.primaryDeep,
+                  ),
+                if (widget.onToggleVoice != null)
+                  IconButton(
+                    key: const Key('chat_voice'),
+                    tooltip: widget.isRecording
+                        ? AppCopy.stopRecording
+                        : AppCopy.recordVoice,
+                    onPressed: widget.enabled ? widget.onToggleVoice : null,
+                    icon: Icon(
+                      widget.isRecording
+                          ? Icons.stop_circle_outlined
+                          : Icons.mic_none_rounded,
+                    ),
+                    color: AppColors.primaryDeep,
+                  ),
+              ],
               Expanded(
                 child: Focus(
                   onKeyEvent: _onKey,
@@ -188,7 +249,7 @@ class _ChatComposerState extends State<ChatComposer> {
                     key: const Key('chat_input'),
                     controller: widget.controller,
                     focusNode: _focusNode,
-                    enabled: widget.enabled,
+                    enabled: widget.enabled && !widget.isRecording,
                     minLines: 1,
                     maxLines: 4,
                     textInputAction: widget.textInputAction,
@@ -209,7 +270,9 @@ class _ChatComposerState extends State<ChatComposer> {
               ),
               IconButton(
                 key: const Key('chat_send'),
-                onPressed: widget.enabled ? widget.onSend : null,
+                onPressed: widget.enabled && !widget.isRecording
+                    ? widget.onSend
+                    : null,
                 icon: const Icon(Icons.send_rounded),
                 color: AppColors.primaryDeep,
               ),
@@ -217,6 +280,54 @@ class _ChatComposerState extends State<ChatComposer> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PendingMediaStrip extends StatelessWidget {
+  const _PendingMediaStrip({
+    required this.items,
+    required this.enabled,
+    this.onRemove,
+  });
+
+  final List<ChatMediaItem> items;
+  final bool enabled;
+  final ValueChanged<String>? onRemove;
+
+  IconData _iconFor(ChatMediaKind kind) {
+    return switch (kind) {
+      ChatMediaKind.image => Icons.image_outlined,
+      ChatMediaKind.audio => Icons.graphic_eq_rounded,
+      ChatMediaKind.file => Icons.insert_drive_file_outlined,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+      child: SizedBox(
+        key: const Key('chat_pending_media'),
+        height: 40,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const SizedBox(width: SpacingTokens.sm),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return InputChip(
+              key: Key('chat_pending_${item.id}'),
+              avatar: Icon(_iconFor(item.kind), size: 18),
+              label: Text(item.displayName),
+              onDeleted:
+                  enabled && onRemove != null ? () => onRemove!(item.id) : null,
+              deleteButtonTooltipMessage: AppCopy.removeAttachment,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            );
+          },
+        ),
+      ),
     );
   }
 }

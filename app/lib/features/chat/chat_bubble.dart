@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../app_copy.dart';
+import '../../chat/chat_media.dart';
 import '../../data/conversation_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/glass_tokens.dart';
@@ -104,8 +106,7 @@ class ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.isUser;
-    final align =
-        isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final align = isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final fill = isUser ? GlassFill.roseSoft : GlassFill.light;
     final radius = isUser
         ? const BorderRadius.only(
@@ -120,6 +121,7 @@ class ChatBubble extends StatelessWidget {
             bottomLeft: Radius.circular(6),
             bottomRight: Radius.circular(20),
           );
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: SpacingTokens.xs),
@@ -175,16 +177,27 @@ class ChatBubble extends StatelessWidget {
                       horizontal: SpacingTokens.md,
                       vertical: SpacingTokens.sm,
                     ),
-                    child: animateReveal && !isUser
-                        ? _TypewriterText(
-                            key: ValueKey('type_${message.id}'),
-                            text: message.content,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                    child: isUser
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (message.media.isNotEmpty)
+                                _MessageMediaRow(media: message.media),
+                              if (message.content.isNotEmpty)
+                                Text(message.content, style: bodyStyle),
+                            ],
                           )
-                        : Text(
-                            message.content,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
+                        : animateReveal
+                            ? _TypewriterText(
+                                key: ValueKey('type_${message.id}'),
+                                text: message.content,
+                                style: bodyStyle,
+                              )
+                            : _AssistantMarkdown(
+                                data: message.content,
+                                style: bodyStyle,
+                              ),
                   ),
                 ),
               ),
@@ -250,6 +263,87 @@ class ChatBubble extends StatelessWidget {
   }
 }
 
+class _MessageMediaRow extends StatelessWidget {
+  const _MessageMediaRow({required this.media});
+
+  final List<ChatMediaItem> media;
+
+  IconData _iconFor(ChatMediaKind kind) {
+    return switch (kind) {
+      ChatMediaKind.image => Icons.image_outlined,
+      ChatMediaKind.audio => Icons.graphic_eq_rounded,
+      ChatMediaKind.file => Icons.insert_drive_file_outlined,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
+      child: Wrap(
+        key: const Key('message_media_row'),
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          for (final item in media)
+            Chip(
+              key: Key('message_media_${item.id}'),
+              avatar: Icon(_iconFor(item.kind), size: 16),
+              label: Text(
+                item.displayName,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Themed markdown for assistant bubbles (user stays plain [Text]).
+class _AssistantMarkdown extends StatelessWidget {
+  const _AssistantMarkdown({required this.data, this.style});
+
+  final String data;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = (style ?? Theme.of(context).textTheme.bodyMedium)?.copyWith(
+          color: AppColors.onSurface,
+          height: 1.45,
+        ) ??
+        const TextStyle(color: AppColors.onSurface, height: 1.45);
+    final demotedHeading = base.copyWith(
+      fontWeight: FontWeight.w600,
+      fontSize: base.fontSize,
+    );
+    return MarkdownBody(
+      data: data,
+      selectable: false,
+      softLineBreak: true,
+      styleSheet: MarkdownStyleSheet(
+        p: base,
+        strong: base.copyWith(fontWeight: FontWeight.w600),
+        em: base.copyWith(fontStyle: FontStyle.italic),
+        listBullet: base,
+        listIndent: 20,
+        h1: demotedHeading,
+        h2: demotedHeading,
+        h3: demotedHeading,
+        h4: demotedHeading,
+        h5: demotedHeading,
+        h6: demotedHeading,
+        blockSpacing: 6,
+        listBulletPadding: const EdgeInsets.only(right: 6),
+        a: base.copyWith(color: AppColors.primaryDeep),
+      ),
+    );
+  }
+}
+
 class _TypewriterText extends StatefulWidget {
   const _TypewriterText({
     super.key,
@@ -290,6 +384,9 @@ class _TypewriterTextState extends State<_TypewriterText>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
+        if (_controller.isCompleted) {
+          return _AssistantMarkdown(data: widget.text, style: widget.style);
+        }
         final chars = widget.text.characters;
         final count =
             (chars.length * _controller.value).ceil().clamp(0, chars.length);

@@ -7,6 +7,8 @@ import '../../providers.dart';
 import '../../theme/spacing_tokens.dart';
 import '../../widgets/atmosphere_background.dart';
 import '../../widgets/glass/glass_tab_bar.dart';
+import '../../widgets/glass/sliver_collapsing_glass_header.dart';
+import 'home_nudge.dart';
 import 'role_entry_grid.dart';
 import 'today_task_teaser.dart';
 import 'widgets/agent_nudge_card.dart';
@@ -85,44 +87,76 @@ class _HomeBody extends StatelessWidget {
   final VoidCallback onOpenProfile;
   final VoidCallback onFocusMood;
 
+  /// Approximate nudge card height when visible (padding + one-line row).
+  static const double _nudgeBodyExtent = 64;
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        SpacingTokens.pageMargin,
-        MediaQuery.paddingOf(context).top + SpacingTokens.lg,
-        SpacingTokens.pageMargin,
-        MediaQuery.paddingOf(context).bottom +
-            GlassTabBar.height +
-            SpacingTokens.xl,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AgentNudgeCard(
-            snapshot: snapshot,
-            onOpenProfile: onOpenProfile,
-            onFocusMood: onFocusMood,
+    final topInset = MediaQuery.paddingOf(context).top;
+    final bottomPad = MediaQuery.paddingOf(context).bottom +
+        GlassTabBar.height +
+        SpacingTokens.xl;
+    final hasNudge = resolveHomeNudge(snapshot) != null;
+    final expandedBody = JourneyHeroCard.expandedExtent +
+        SpacingTokens.md +
+        (hasNudge ? _nudgeBodyExtent + SpacingTokens.md : 0);
+
+    return CustomScrollView(
+      key: const Key('home_scroll'),
+      slivers: [
+        SliverCollapsingGlassHeader(
+          topInset: topInset + SpacingTokens.sm,
+          expandedBodyHeight: expandedBody,
+          collapsedBodyHeight:
+              JourneyHeroCard.collapsedExtent + SpacingTokens.sm,
+          horizontalPadding: SpacingTokens.pageMargin,
+          expanded: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AgentNudgeCard(
+                snapshot: snapshot,
+                onOpenProfile: onOpenProfile,
+                onFocusMood: onFocusMood,
+              ),
+              if (hasNudge) const SizedBox(height: SpacingTokens.md),
+              JourneyHeroCard(snapshot: snapshot),
+            ],
           ),
-          const SizedBox(height: SpacingTokens.md),
-          JourneyHeroCard(snapshot: snapshot),
-          const SizedBox(height: SpacingTokens.md),
-          RoleEntryGrid(onSelect: onSelectRole),
-          const SizedBox(height: SpacingTokens.sectionGap),
-          HydrationModule(snapshot: snapshot),
-          const SizedBox(height: SpacingTokens.md),
-          HealthSnapshotStrip(
-            snapshot: snapshot,
-            moodFocusKey: moodSectionKey,
+          collapsed: Align(
+            alignment: Alignment.center,
+            child: JourneyPinnedBar(snapshot: snapshot),
           ),
-          const SizedBox(height: SpacingTokens.md),
-          MedsPendingCard(snapshot: snapshot),
-          const SizedBox(height: SpacingTokens.md),
-          const TodayCareModule(),
-          const SizedBox(height: SpacingTokens.md),
-          NutritionFocusCard(snapshot: snapshot),
-        ],
-      ),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            SpacingTokens.pageMargin,
+            SpacingTokens.md,
+            SpacingTokens.pageMargin,
+            bottomPad,
+          ),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                RoleEntryGrid(onSelect: onSelectRole),
+                const SizedBox(height: SpacingTokens.sectionGap),
+                HydrationModule(snapshot: snapshot),
+                const SizedBox(height: SpacingTokens.md),
+                HealthSnapshotStrip(
+                  snapshot: snapshot,
+                  moodFocusKey: moodSectionKey,
+                ),
+                const SizedBox(height: SpacingTokens.md),
+                MedsPendingCard(snapshot: snapshot),
+                const SizedBox(height: SpacingTokens.md),
+                const TodayCareModule(),
+                const SizedBox(height: SpacingTokens.md),
+                NutritionFocusCard(snapshot: snapshot),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

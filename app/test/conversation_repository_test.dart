@@ -34,6 +34,20 @@ void main() {
     expect(msgs.single.speakerRole, isNull);
   });
 
+  test('should persist mediaRef on user message', () async {
+    final id = await repo.getOrCreateSolo(role: AgentRole.xiaonuan);
+    const mediaJson =
+        '[{"id":"m1","kind":"file","localPath":"/x.pdf","displayName":"x.pdf"}]';
+    await repo.insertUserMessage(
+      conversationId: id,
+      content: '[附件] x.pdf',
+      mediaRef: mediaJson,
+    );
+    final msgs = await repo.listMessages(id);
+    expect(msgs.single.media, hasLength(1));
+    expect(msgs.single.media.single.displayName, 'x.pdf');
+  });
+
   test('AC-04-F02 assistant speaker display name', () async {
     final id = await repo.getOrCreateSolo(role: AgentRole.xiaonuan);
     await repo.insertAssistantMessage(

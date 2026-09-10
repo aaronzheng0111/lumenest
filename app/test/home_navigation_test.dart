@@ -326,7 +326,7 @@ void main() {
     await tester.tap(find.byKey(const Key('launch_privacy_dismiss')));
     await tester.pumpAndSettle();
     expect(find.text('孕期'), findsOneWidget);
-    expect(find.text('孕16周'), findsOneWidget);
+    expect(find.text('孕20周'), findsOneWidget);
   });
 
   testWidgets('agree and continue leaves launch page for home', (tester) async {

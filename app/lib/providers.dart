@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'agent/group_consult_graph.dart';
 import 'agent/next_speaker.dart';
@@ -8,11 +9,17 @@ import 'agent/role_prompts.dart';
 import 'context/context_slice.dart';
 import 'context/drift_context_slice.dart';
 import 'data/active_user_store.dart';
+import 'data/chat_attachment_picker.dart';
+import 'data/chat_composer_media_controller.dart';
+import 'data/chat_voice_recorder.dart';
 import 'data/conversation_repository.dart';
 import 'data/db/database_provider.dart';
 import 'data/drift_conversation_repository.dart';
 import 'data/drift_user_profile_repository.dart';
+import 'data/file_picker_chat_attachment_picker.dart';
+import 'data/local_chat_media_store.dart';
 import 'data/privacy_store.dart';
+import 'data/record_chat_voice_recorder.dart';
 import 'data/user_profile_repository.dart';
 import 'domain/agent_role.dart';
 import 'domain/rich_user_profile.dart';
@@ -183,8 +190,7 @@ final chatSuggestionsCatalogProvider =
 final chatSuggestionsForProvider = Provider.autoDispose
     .family<List<String>, ({String scene, AgentRole? role})>((ref, args) {
   return ref.watch(chatSuggestionsCatalogProvider).maybeWhen(
-        data: (catalog) =>
-            catalog.suggestionsFor(args.scene, role: args.role),
+        data: (catalog) => catalog.suggestionsFor(args.scene, role: args.role),
         orElse: () => const <String>[],
       );
 });
@@ -260,10 +266,32 @@ final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
   ref.watch(activeUserIdProvider);
   return DriftConversationRepository(
     ref.watch(databaseProvider),
-    activeUserId: () =>
-        ref.read(activeUserIdProvider).valueOrNull ?? 1,
+    activeUserId: () => ref.read(activeUserIdProvider).valueOrNull ?? 1,
   );
 });
+
+final chatMediaStoreProvider = Provider<LocalChatMediaStore>((ref) {
+  return LocalChatMediaStore(
+    rootDirectory: getApplicationDocumentsDirectory,
+  );
+});
+
+final chatAttachmentPickerProvider = Provider<ChatAttachmentPicker>((ref) {
+  return FilePickerChatAttachmentPicker();
+});
+
+/// Creates a fresh media controller per chat page (not a shared singleton).
+ChatComposerMediaController createChatComposerMediaController({
+  required ChatAttachmentPicker picker,
+  required LocalChatMediaStore store,
+  ChatVoiceRecorder? recorder,
+}) {
+  return ChatComposerMediaController(
+    picker: picker,
+    recorder: recorder ?? RecordChatVoiceRecorder(),
+    store: store,
+  );
+}
 
 final conversationListProvider =
     FutureProvider<List<ConversationListItem>>((ref) async {
@@ -352,7 +380,8 @@ final agentGraphProvider =
 /// Debug override until subscription module (12) lands. Default true for P1 QA.
 final groupConsultEnabledProvider = Provider<bool>((ref) => true);
 
-final groupConsultGraphProvider = FutureProvider<GroupConsultGraph>((ref) async {
+final groupConsultGraphProvider =
+    FutureProvider<GroupConsultGraph>((ref) async {
   SafetyGate safety;
   try {
     safety = await ref.watch(safetyGateProvider.future);
@@ -405,13 +434,11 @@ final taskCardServiceProvider = FutureProvider<TaskCardService>((ref) async {
     databaseProvider: ref.watch(databaseProvider),
     profiles: ref.watch(userProfileRepositoryProvider),
     templates: templates,
-    activeUserId: () =>
-        ref.read(activeUserIdProvider).valueOrNull ?? 1,
+    activeUserId: () => ref.read(activeUserIdProvider).valueOrNull ?? 1,
   );
 });
 
-final todayTaskCardsProvider =
-    FutureProvider<List<TaskCardView>>((ref) async {
+final todayTaskCardsProvider = FutureProvider<List<TaskCardView>>((ref) async {
   try {
     await ref.watch(databaseReadyProvider.future);
     final service = await ref.watch(taskCardServiceProvider.future);
@@ -465,9 +492,7 @@ class HomeCheckInController {
       (c) => c.copyWith(mood: label),
       eventCategory: label == null || label.isEmpty ? null : 'MOOD',
       eventSummary: label == null || label.isEmpty ? null : '心情：$label',
-      eventRawRef: label == null || label.isEmpty
-          ? null
-          : '{"type":"mood"}',
+      eventRawRef: label == null || label.isEmpty ? null : '{"type":"mood"}',
     );
     await _refresh();
   }

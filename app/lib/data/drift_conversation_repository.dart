@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../chat/chat_media.dart';
 import '../domain/agent_role.dart';
 import 'conversation_repository.dart';
 import 'db/app_database.dart';
@@ -85,12 +86,14 @@ class DriftConversationRepository implements ConversationRepository {
   Future<int> insertUserMessage({
     required int conversationId,
     required String content,
+    String? mediaRef,
   }) {
     return _db.into(_db.messages).insert(
           MessagesCompanion.insert(
             conversationId: conversationId,
             role: MessageRoleWire.user,
             content: content,
+            imageRef: mediaRef == null ? const Value.absent() : Value(mediaRef),
             createdAt: DateTime.now().toUtc(),
           ),
         );
@@ -139,8 +142,7 @@ class DriftConversationRepository implements ConversationRepository {
             ])
             ..limit(1))
           .get();
-      final lastAt =
-          last.isEmpty ? c.createdAt : last.first.createdAt;
+      final lastAt = last.isEmpty ? c.createdAt : last.first.createdAt;
       items.add(
         ConversationListItem(
           id: c.id,
@@ -203,6 +205,7 @@ class DriftConversationRepository implements ConversationRepository {
       createdAt: row.createdAt,
       safetyBadge: safety,
       sourceTitles: sources,
+      media: ChatMediaItem.decodeList(row.imageRef),
     );
   }
 }

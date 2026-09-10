@@ -9,8 +9,7 @@ abstract final class AppCopy {
   static const comingSoon = '即将提供';
   static const privacyRequiredToChat = '请先在「我的」同意隐私说明';
   static const privacyTitle = '隐私说明';
-  static const privacyBody =
-      '健康数据以设备本地为主。我们不上传整库。对话与档案默认只保存在本机。';
+  static const privacyBody = '健康数据以设备本地为主。我们不上传整库。对话与档案默认只保存在本机。';
   static const privacyAgree = '同意并继续';
   static const privacyClose = '关闭';
   static const exportData = '导出我的数据';
@@ -58,4 +57,15 @@ abstract final class AppCopy {
 
   static String soloChatHint(String roleDisplayName) =>
       '和$roleDisplayName说点什么…';
+
+  static const attachFile = '上传文件';
+  static const recordVoice = '发送语音';
+  static const stopRecording = '停止录音';
+  static const recordingVoice = '正在录音…';
+  static const attachmentTooLarge = '文件太大，请重选';
+  static const tooManyAttachments = '一次最多 5 个附件';
+  static const voicePermissionDenied = '需要麦克风权限才能发送语音';
+  static const voiceTooShort = '录音太短，请再说一次';
+  static const voiceFailed = '录音失败，请稍后再试';
+  static const removeAttachment = '移除附件';
 }

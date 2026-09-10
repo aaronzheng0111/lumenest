@@ -56,4 +56,46 @@ void main() {
     );
     expect(find.text('来源：'), findsNothing);
   });
+
+  testWidgets('assistant bubble renders markdown bold without raw stars',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: ChatBubble(
+            message: ChatMessage(
+              id: 3,
+              conversationId: 1,
+              role: 'assistant',
+              content: '记得吃**重点**营养。',
+              createdAt: DateTime.utc(2026, 1, 1),
+              speakerRole: 'XIAONUAN',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('**重点**'), findsNothing);
+    expect(find.textContaining('重点'), findsWidgets);
+    // User bubbles stay plain Text — raw markdown markers remain.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: ChatBubble(
+            message: ChatMessage(
+              id: 4,
+              conversationId: 1,
+              role: 'user',
+              content: '我说了**重点**',
+              createdAt: DateTime.utc(2026, 1, 1),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('我说了**重点**'), findsOneWidget);
+  });
 }

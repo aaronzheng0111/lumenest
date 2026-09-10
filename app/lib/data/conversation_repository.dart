@@ -1,3 +1,4 @@
+import '../chat/chat_media.dart';
 import '../domain/agent_role.dart';
 
 class ChatMessage {
@@ -10,6 +11,7 @@ class ChatMessage {
     this.speakerRole,
     this.safetyBadge = false,
     this.sourceTitles = const [],
+    this.media = const [],
   });
 
   final int id;
@@ -22,6 +24,9 @@ class ChatMessage {
   final DateTime createdAt;
   final bool safetyBadge;
   final List<String> sourceTitles;
+
+  /// Local attachments decoded from Drift `image_ref`.
+  final List<ChatMediaItem> media;
 
   bool get isUser => role == 'user';
   bool get isAssistant => role == 'assistant';
@@ -62,6 +67,7 @@ abstract class ConversationRepository {
   Future<int> insertUserMessage({
     required int conversationId,
     required String content,
+    String? mediaRef,
   });
 
   Future<int> insertAssistantMessage({

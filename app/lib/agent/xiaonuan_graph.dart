@@ -152,6 +152,9 @@ class XiaonuanGraph {
         currentTime: timeResult,
         profileUpdateSummary:
             profileResult?.applied == true ? profileResult!.summary : null,
+        profileProposeSummary: profileResult?.proposeOnly == true
+            ? profileResult!.summary
+            : null,
       );
       llmCalls = 0;
       usedOffline = true;
@@ -181,6 +184,9 @@ class XiaonuanGraph {
             currentTime: timeResult,
             profileUpdateSummary:
                 profileResult?.applied == true ? profileResult!.summary : null,
+            profileProposeSummary: profileResult?.proposeOnly == true
+                ? profileResult!.summary
+                : null,
           ),
         _ => LlmUserCopy.retryLater,
       };
@@ -235,9 +241,12 @@ class XiaonuanGraph {
       userText: userText,
       now: clock?.call(),
     );
-    if (!result.applied) return null;
-    toolsUsed.add(AgentTool.updateProfile);
-    return result;
+    if (result.applied) {
+      toolsUsed.add(AgentTool.updateProfile);
+      return result;
+    }
+    if (result.proposeOnly) return result;
+    return null;
   }
 
   Future<List<KnowledgeHit>> _retrieveForRole(String userText) async {

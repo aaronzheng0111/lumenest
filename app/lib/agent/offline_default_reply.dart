@@ -7,11 +7,16 @@ abstract final class OfflineDefaultReply {
     required String userText,
     String? currentTime,
     String? profileUpdateSummary,
+    String? profileProposeSummary,
   }) {
     final name = speaker.displayName;
     if (profileUpdateSummary != null && profileUpdateSummary.isNotEmpty) {
       return '我是$name。已帮你更新档案：$profileUpdateSummary。'
           '也可以随时在「我的」里手动修改同一份资料。'
+          '这是未配置模型密钥时的演示回复。';
+    }
+    if (profileProposeSummary != null && profileProposeSummary.isNotEmpty) {
+      return '我是$name。$profileProposeSummary'
           '这是未配置模型密钥时的演示回复。';
     }
     if (currentTime != null && currentTime.isNotEmpty) {

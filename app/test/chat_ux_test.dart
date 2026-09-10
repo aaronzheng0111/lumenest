@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_mom_baby/agent/tool_acl.dart';
 import 'package:ai_mom_baby/agent/tool_labels.dart';
 import 'package:ai_mom_baby/app_copy.dart';
+import 'package:ai_mom_baby/chat/chat_media.dart';
 import 'package:ai_mom_baby/chat/chat_suggestions_catalog.dart';
 import 'package:ai_mom_baby/domain/agent_role.dart';
 import 'package:ai_mom_baby/features/chat/chat_composer.dart';
@@ -55,6 +56,26 @@ void main() {
           speaker: AgentRole.xiaonuan,
         ),
         [AgentTool.getCurrentTime],
+      );
+    });
+
+    test('predicts updateProfile for profile intents', () {
+      expect(
+        predictPendingTools(
+          userText: '我吃了叶酸',
+          speaker: AgentRole.xiaonuan,
+        ),
+        [AgentTool.updateProfile],
+      );
+    });
+
+    test('predicts both when time and profile intents match', () {
+      expect(
+        predictPendingTools(
+          userText: '现在时间是？顺便说下我吃了叶酸',
+          speaker: AgentRole.xiaonuan,
+        ),
+        [AgentTool.getCurrentTime, AgentTool.updateProfile],
       );
     });
 
@@ -198,6 +219,72 @@ void main() {
     expect(picked, prompts.first);
   });
 
+  testWidgets('composer shows attach and voice actions', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    var attachTaps = 0;
+    var voiceTaps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            enabled: true,
+            hintText: 'hint',
+            onSend: () {},
+            onAttach: () => attachTaps++,
+            onToggleVoice: () => voiceTaps++,
+            pendingMedia: const [
+              ChatMediaItem(
+                id: 'p1',
+                kind: ChatMediaKind.file,
+                localPath: '/tmp/a.pdf',
+                displayName: 'a.pdf',
+              ),
+            ],
+            onRemoveMedia: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('chat_attach')), findsOneWidget);
+    expect(find.byKey(const Key('chat_voice')), findsOneWidget);
+    expect(find.byKey(const Key('chat_pending_media')), findsOneWidget);
+    expect(find.byKey(const Key('chat_pending_p1')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('chat_attach')));
+    await tester.tap(find.byKey(const Key('chat_voice')));
+    await tester.pump();
+    expect(attachTaps, 1);
+    expect(voiceTaps, 1);
+  });
+
+  testWidgets('composer shows recording label when recording', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            enabled: true,
+            hintText: 'hint',
+            onSend: () {},
+            isRecording: true,
+            onAttach: () {},
+            onToggleVoice: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('chat_recording_label')), findsOneWidget);
+    expect(find.text(AppCopy.recordingVoice), findsOneWidget);
+  });
+
   testWidgets('awaiting reply shows tool chip', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -211,7 +298,8 @@ void main() {
     expect(find.byKey(const Key('chat_tool_getCurrentTime')), findsOneWidget);
     expect(
       find.text(
-        AppCopy.callingTool(AgentToolLabels.displayName(AgentTool.getCurrentTime)),
+        AppCopy.callingTool(
+            AgentToolLabels.displayName(AgentTool.getCurrentTime)),
       ),
       findsOneWidget,
     );

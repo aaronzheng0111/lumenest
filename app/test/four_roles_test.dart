@@ -33,6 +33,29 @@ void main() {
     }
   });
 
+  test('T11-01 xiaonuan orchestra anchors', () {
+    final text = File(
+      '../assets/fixtures/prompts/xiaonuan_system_prompt.txt',
+    ).readAsStringSync();
+    expect(text.contains('你是小暖'), isTrue);
+    expect(text.contains('不提供用药剂量'), isTrue);
+    expect(text.contains('Orchestra') || text.contains('编排'), isTrue);
+    expect(text.contains('以谁为准'), isTrue);
+  });
+
+  test('T11-01 specialist prompts sync to sdd/11 mirrors', () {
+    for (final name in ['lin', 'suxin', 'ama']) {
+      final asset = File(
+        '../assets/fixtures/prompts/${name}_system_prompt.txt',
+      ).readAsStringSync();
+      final mirror = File(
+        '../sdd/11-four-roles-and-handoff/fixtures/prompts/'
+        '${name}_system_prompt.txt',
+      ).readAsStringSync();
+      expect(asset, mirror, reason: name);
+    }
+  });
+
   test('T11-03 tool ACL table', () {
     expect(ToolAcl.canUse(AgentRole.xiaonuan, AgentTool.retrieveKb), isTrue);
     expect(ToolAcl.canUse(AgentRole.lin, AgentTool.toggleTask), isFalse);

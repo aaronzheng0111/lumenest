@@ -43,6 +43,61 @@ void main() {
       expect(UpdateProfileTool.shouldInvoke('更新档案：过敏花生'), isTrue);
       expect(UpdateProfileTool.shouldInvoke('今天有点累'), isFalse);
       expect(UpdateProfileTool.shouldInvoke('这周了吗'), isFalse);
+      expect(UpdateProfileTool.shouldInvoke('产后抑郁怎么办'), isFalse);
+      expect(UpdateProfileTool.shouldInvoke('想了解备孕知识'), isFalse);
+    });
+
+    test('identity without explicit intent is propose-only', () async {
+      final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+      await db.init();
+      addTearDown(db.close);
+      final profiles = DriftUserProfileRepository(
+        db,
+        activeUserStore: MemoryActiveUserStore(),
+      );
+      await profiles.saveEdits(
+        ProfileEdits(
+          dueDate: DateTime(2026, 12, 1),
+          lastMenstruationDate: DateTime(2026, 2, 25),
+        ),
+        today: DateTime(2026, 9, 9),
+      );
+      final result = await UpdateProfileTool.invoke(
+        profiles: profiles,
+        userText: '我在备孕',
+        now: DateTime(2026, 9, 9),
+      );
+      expect(result.applied, isFalse);
+      expect(result.proposeOnly, isTrue);
+      final snap = await profiles.getSnapshot(today: DateTime(2026, 9, 9));
+      expect(snap.dueDate, isNotNull);
+    });
+
+    test('allergy clear without explicit intent does not wipe', () async {
+      final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+      await db.init();
+      addTearDown(db.close);
+      final profiles = DriftUserProfileRepository(
+        db,
+        activeUserStore: MemoryActiveUserStore(),
+      );
+      await profiles.saveRichProfile(
+        const RichUserProfile(
+          allergies: AllergyBag(
+            certainty: FieldCertainty.known,
+            other: ['花生'],
+          ),
+        ),
+      );
+      final result = await UpdateProfileTool.invoke(
+        profiles: profiles,
+        userText: '无过敏',
+        now: DateTime(2026, 9, 9),
+      );
+      expect(result.applied, isFalse);
+      expect(result.proposeOnly, isTrue);
+      final rich = await profiles.loadRichProfile();
+      expect(rich.allergies.other, ['花生']);
     });
 
     test('invoke writes rich profile via repository', () async {
@@ -55,7 +110,7 @@ void main() {
       );
       final result = await UpdateProfileTool.invoke(
         profiles: profiles,
-        userText: '我孕12周了，过敏花生，我吃了叶酸',
+        userText: '我孕12周了，更新档案：过敏花生，我吃了叶酸',
         now: DateTime(2026, 9, 9),
       );
       expect(result.applied, isTrue);
@@ -65,15 +120,16 @@ void main() {
       // Week override is write-through then cleared; Stage week is SSOT.
       expect(rich.pregnancyWeekOverride, isNull);
       expect(rich.allergies.certainty, FieldCertainty.known);
+      expect(rich.allergies.other, contains('花生'));
       expect(rich.todayCheckIn.prenatalVitaminTaken, isTrue);
       final snap = await profiles.getSnapshot(today: DateTime(2026, 9, 9));
       expect(snap.stage, Stage.pregnant);
       expect(snap.weekValue, 12);
-      expect(snap.agentArchiveLine.contains('备孕'), isFalse);
+      expect(snap.stage, isNot(Stage.prep));
       expect(snap.agentArchiveLine.contains('妊娠状态='), isFalse);
     });
 
-    test('invoke trying-to-conceive clears pregnancy dates', () async {
+    test('explicit trying-to-conceive clears pregnancy dates', () async {
       final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
       await db.init();
       addTearDown(db.close);
@@ -96,7 +152,7 @@ void main() {
       );
       final result = await UpdateProfileTool.invoke(
         profiles: profiles,
-        userText: '我在备孕',
+        userText: '更新档案：我在备孕',
         now: DateTime(2026, 9, 9),
       );
       expect(result.applied, isTrue);
@@ -106,6 +162,50 @@ void main() {
       expect(snap.rich.pregnancyWeekOverride, isNull);
       expect(snap.agentArchiveLine, isNot(contains('孕20')));
       expect(snap.weekLabel, isNot(contains('孕')));
+    });
+
+    test('allergy tags merge instead of replace', () async {
+      final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+      await db.init();
+      addTearDown(db.close);
+      final profiles = DriftUserProfileRepository(
+        db,
+        activeUserStore: MemoryActiveUserStore(),
+      );
+      await profiles.saveRichProfile(
+        const RichUserProfile(
+          allergies: AllergyBag(
+            certainty: FieldCertainty.known,
+            other: ['花生'],
+          ),
+        ),
+      );
+      final result = await UpdateProfileTool.invoke(
+        profiles: profiles,
+        userText: '更新档案：过敏海鲜',
+        now: DateTime(2026, 9, 9),
+      );
+      expect(result.applied, isTrue);
+      final rich = await profiles.loadRichProfile();
+      expect(rich.allergies.other, containsAll(['花生', '海鲜']));
+    });
+
+    test('rejects out-of-range vitals', () async {
+      final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+      await db.init();
+      addTearDown(db.close);
+      final profiles = DriftUserProfileRepository(
+        db,
+        activeUserStore: MemoryActiveUserStore(),
+      );
+      final result = await UpdateProfileTool.invoke(
+        profiles: profiles,
+        userText: '体重 5kg',
+        now: DateTime(2026, 9, 9),
+      );
+      expect(result.applied, isFalse);
+      final rich = await profiles.loadRichProfile();
+      expect(rich.currentWeightKg, isNull);
     });
 
     test('manual and agent share same persistence', () async {
@@ -185,9 +285,48 @@ void main() {
     expect(rich.todayCheckIn.prenatalVitaminTaken, isTrue);
   });
 
-  test('ToolAcl allows updateProfile for all roles', () {
-    for (final role in AgentRole.values) {
-      expect(ToolAcl.canUse(role, AgentTool.updateProfile), isTrue);
+  test('solo Lin graph cannot updateProfile', () async {
+    final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+    await db.init();
+    addTearDown(db.close);
+    final profiles = DriftUserProfileRepository(
+      db,
+      activeUserStore: MemoryActiveUserStore(),
+    );
+    final repo = DriftConversationRepository(db);
+    final graph = XiaonuanGraph(
+      safety: _PassGate(),
+      retriever: FakeKnowledgeRetriever(),
+      llm: _OfflineLlm(),
+      messages: repo,
+      systemPrompt: '你是林医生',
+      speaker: AgentRole.lin,
+      profiles: profiles,
+      offlineReplyDelay: Duration.zero,
+      clock: () => DateTime(2026, 9, 9, 10),
+    );
+    final cid = await repo.getOrCreateSolo(role: AgentRole.lin);
+    final result = await graph.handle(
+      conversationId: cid,
+      userText: '我吃了叶酸',
+    );
+    expect(result.toolsUsed, isNot(contains(AgentTool.updateProfile)));
+    final rich = await profiles.loadRichProfile();
+    expect(rich.todayCheckIn.prenatalVitaminTaken, isNot(true));
+  });
+
+  test('ToolAcl allows updateProfile only for Xiaonuan', () {
+    expect(ToolAcl.canUse(AgentRole.xiaonuan, AgentTool.updateProfile), isTrue);
+    for (final role in [
+      AgentRole.lin,
+      AgentRole.suxin,
+      AgentRole.ama,
+    ]) {
+      expect(
+        ToolAcl.canUse(role, AgentTool.updateProfile),
+        isFalse,
+        reason: role.wireId,
+      );
     }
   });
 }

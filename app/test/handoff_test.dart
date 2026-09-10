@@ -7,10 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_mom_baby/agent/group_consult_graph.dart';
 import 'package:ai_mom_baby/agent/group_intent_router.dart';
 import 'package:ai_mom_baby/agent/next_speaker.dart';
+import 'package:ai_mom_baby/agent/tool_acl.dart';
 import 'package:ai_mom_baby/context/drift_context_slice.dart';
+import 'package:ai_mom_baby/data/active_user_store.dart';
 import 'package:ai_mom_baby/data/db/database_provider.dart';
 import 'package:ai_mom_baby/data/db/domain_enums.dart';
 import 'package:ai_mom_baby/data/drift_conversation_repository.dart';
+import 'package:ai_mom_baby/data/drift_user_profile_repository.dart';
 import 'package:ai_mom_baby/domain/agent_role.dart';
 import 'package:ai_mom_baby/knowledge/knowledge_retriever.dart';
 import 'package:ai_mom_baby/llm/llm_types.dart';
@@ -140,6 +143,11 @@ void main() {
     expect(second.first.role, 'system');
     expect(second.first.content, contains('【会诊身份】'));
     expect(second.first.content, contains('苏心'));
+    expect(second.first.content, contains('专科补充'));
+    expect(second.first.content, contains('不要宣称已改档案'));
+    final firstSystem = llm.callMessages[0].first.content;
+    expect(firstSystem, contains('编排者'));
+    expect(firstSystem, contains('以苏心为准'));
     expect(
       second.map((m) => '${m.role}:${m.content}').toList(),
       containsAllInOrder([
@@ -180,6 +188,41 @@ void main() {
     );
     expect(result.llmCalls, 1);
     expect(result.assistantContent, isNotEmpty);
+  });
+
+  test('group Lin-only turn does not updateProfile for 我吃了叶酸', () async {
+    final db = DriftDatabaseProvider(executor: NativeDatabase.memory());
+    await db.init();
+    addTearDown(db.close);
+    final profiles = DriftUserProfileRepository(
+      db,
+      activeUserStore: MemoryActiveUserStore(),
+    );
+    final repo = DriftConversationRepository(db);
+    final graph = GroupConsultGraph(
+      safety: _PassGate(),
+      retriever: FakeKnowledgeRetriever(),
+      llm: _OfflineLlm(),
+      messages: repo,
+      slicer: EmptyContextSlicer(),
+      summaryWriter: NoopSummaryWriter(),
+      routerRules: rules,
+      profiles: profiles,
+      promptLoader: (role) async => '你是${role.displayName}',
+      offlineReplyDelay: Duration.zero,
+      clock: () => DateTime(2026, 9, 9, 10),
+    );
+    final cid = await repo.getOrCreateGroup();
+    const text = '@林医生 我吃了叶酸';
+    await repo.insertUserMessage(conversationId: cid, content: text);
+    final result = await graph.handle(conversationId: cid, userText: text);
+    expect(result.toolsUsed, isNot(contains(AgentTool.updateProfile)));
+    final rich = await profiles.loadRichProfile();
+    expect(rich.todayCheckIn.prenatalVitaminTaken, isNot(true));
+    final msgs = await repo.listMessages(cid);
+    final assistants = msgs.where((m) => m.isAssistant).toList();
+    expect(assistants, hasLength(1));
+    expect(assistants.single.speakerRole, 'LIN');
   });
 }
 
@@ -222,4 +265,17 @@ class _ScriptedIntentLlm extends LlmClient {
 class _PassGate implements SafetyGate {
   @override
   SafetyDecision inspect(String userText) => const SafetyDecision.pass();
+}
+
+class _OfflineLlm extends LlmClient {
+  @override
+  bool get canCallRemote => false;
+
+  @override
+  Future<LlmResult> complete({
+    required List<ChatMessageWire> messages,
+    required String requestId,
+  }) async {
+    return const LlmResult(status: LlmStatus.missingKey);
+  }
 }

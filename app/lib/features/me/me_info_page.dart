@@ -12,6 +12,7 @@ import '../../theme/spacing_tokens.dart';
 import '../../widgets/atmosphere_background.dart';
 import '../../widgets/glass/glass_container.dart';
 import '../../widgets/glass/glass_tab_bar.dart';
+import '../../widgets/glass/sliver_collapsing_glass_header.dart';
 import 'health_section_page.dart';
 import 'lifestyle_section_page.dart';
 import 'medications_section_page.dart';
@@ -23,6 +24,9 @@ import 'profile_ui_shared.dart';
 
 class MeInfoPage extends ConsumerWidget {
   const MeInfoPage({super.key});
+
+  static const double _headerExpanded = 180;
+  static const double _headerCollapsed = 56;
 
   Future<void> _openSection(
     BuildContext context,
@@ -41,171 +45,208 @@ class MeInfoPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final snapshotAsync = ref.watch(userProfileSnapshotProvider);
     final accountsAsync = ref.watch(localAccountsProvider);
+    final topInset = MediaQuery.paddingOf(context).top;
+    final bottomPad = MediaQuery.paddingOf(context).bottom +
+        GlassTabBar.height +
+        SpacingTokens.xl;
+    final snap = snapshotAsync.maybeWhen(
+      data: (s) => s,
+      orElse: () => UserProfileSnapshot.fallback,
+    );
 
     return AtmosphereBackground(
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(
-          SpacingTokens.pageMargin,
-          MediaQuery.paddingOf(context).top + SpacingTokens.lg,
-          SpacingTokens.pageMargin,
-          MediaQuery.paddingOf(context).bottom +
-              GlassTabBar.height +
-              SpacingTokens.xl,
-        ),
-        children: [
-          Text('我的', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: SpacingTokens.lg),
-          snapshotAsync.when(
-            loading: () => const GlassContainer(
-              fill: GlassFill.heavy,
-              borderRadius: RadiusTokens.borderXl,
-              padding: EdgeInsets.all(SpacingTokens.xl),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, __) => _ProfileHero(
-              snapshot: UserProfileSnapshot.fallback,
-              onSwitchAccount: () => _showAccountSwitcher(context, ref),
-            ),
-            data: (snap) => _ProfileHero(
-              snapshot: snap,
-              onSwitchAccount: () => _showAccountSwitcher(context, ref),
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.md),
-          _TodayStrip(snapshotAsync: snapshotAsync),
-          const SizedBox(height: SpacingTokens.lg),
-          Text('档案', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.sm),
-          snapshotAsync.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (snap) => Column(
+      child: CustomScrollView(
+        key: const Key('me_scroll'),
+        slivers: [
+          SliverCollapsingGlassHeader(
+            topInset: topInset + SpacingTokens.sm,
+            expandedBodyHeight: _headerExpanded,
+            collapsedBodyHeight: _headerCollapsed,
+            horizontalPadding: SpacingTokens.pageMargin,
+            expanded: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ProfileSectionCard(
-                  tileKey: const Key('profile_section_personal'),
-                  icon: Icons.person_outline_rounded,
-                  title: '个人',
-                  summary: personalSummary(snap),
-                  onTap: () => _openSection(
-                    context,
-                    ref,
-                    const PersonalSectionPage(),
-                  ),
+                Text(
+                  '我的',
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                ProfileSectionCard(
-                  tileKey: const Key('profile_section_pregnancy'),
-                  icon: Icons.pregnant_woman_outlined,
-                  title: '孕期',
-                  summary: pregnancySummary(snap),
-                  onTap: () => _openSection(
-                    context,
-                    ref,
-                    const PregnancySectionPage(),
+                const SizedBox(height: SpacingTokens.lg),
+                if (snapshotAsync.isLoading)
+                  const GlassContainer(
+                    fill: GlassFill.heavy,
+                    borderRadius: RadiusTokens.borderXl,
+                    padding: EdgeInsets.all(SpacingTokens.xl),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  _ProfileHero(
+                    snapshot: snap,
+                    onSwitchAccount: () => _showAccountSwitcher(context, ref),
                   ),
-                ),
-                ProfileSectionCard(
-                  tileKey: const Key('profile_section_health'),
-                  icon: Icons.favorite_outline_rounded,
-                  title: '健康',
-                  summary: healthSummary(snap),
-                  sensitive: true,
-                  onTap: () => _openSection(
-                    context,
-                    ref,
-                    const HealthSectionPage(),
-                  ),
-                ),
-                ProfileSectionCard(
-                  tileKey: const Key('profile_section_meds'),
-                  icon: Icons.medication_outlined,
-                  title: '用药与过敏',
-                  summary: medicationsSummary(snap),
-                  sensitive: true,
-                  onTap: () => _openSection(
-                    context,
-                    ref,
-                    const MedicationsSectionPage(),
-                  ),
-                ),
-                ProfileSectionCard(
-                  tileKey: const Key('profile_section_lifestyle'),
-                  icon: Icons.spa_outlined,
-                  title: '生活方式',
-                  summary: lifestyleSummary(snap),
-                  onTap: () => _openSection(
-                    context,
-                    ref,
-                    const LifestyleSectionPage(),
-                  ),
-                ),
-                ProfileSectionCard(
-                  tileKey: const Key('profile_section_prefs'),
-                  icon: Icons.tune_rounded,
-                  title: '偏好',
-                  summary: preferencesSummary(snap),
-                  onTap: () => _openSection(
-                    context,
-                    ref,
-                    const PreferencesSectionPage(),
-                  ),
-                ),
               ],
             ),
+            collapsed: Align(
+              alignment: Alignment.center,
+              child: _ProfilePinnedBar(
+                snapshot: snap,
+                onSwitchAccount: () => _showAccountSwitcher(context, ref),
+              ),
+            ),
           ),
-          const SizedBox(height: SpacingTokens.lg),
-          Text('账号与隐私', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.sm),
-          GlassContainer(
-            fill: GlassFill.heavy,
-            borderRadius: RadiusTokens.borderXl,
-            padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
-            child: Column(
-              children: [
-                _MeTile(
-                  tileKey: const Key('me_accounts'),
-                  icon: Icons.switch_account_outlined,
-                  title: accountsAsync.maybeWhen(
-                    data: (list) => '切换账号（${list.length}）',
-                    orElse: () => '切换账号',
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              SpacingTokens.pageMargin,
+              SpacingTokens.md,
+              SpacingTokens.pageMargin,
+              bottomPad,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _TodayStrip(snapshotAsync: snapshotAsync),
+                  const SizedBox(height: SpacingTokens.lg),
+                  Text('档案', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: SpacingTokens.sm),
+                  snapshotAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (snap) => Column(
+                      children: [
+                        ProfileSectionCard(
+                          tileKey: const Key('profile_section_personal'),
+                          icon: Icons.person_outline_rounded,
+                          title: '个人',
+                          summary: personalSummary(snap),
+                          onTap: () => _openSection(
+                            context,
+                            ref,
+                            const PersonalSectionPage(),
+                          ),
+                        ),
+                        ProfileSectionCard(
+                          tileKey: const Key('profile_section_pregnancy'),
+                          icon: Icons.pregnant_woman_outlined,
+                          title: '孕期',
+                          summary: pregnancySummary(snap),
+                          onTap: () => _openSection(
+                            context,
+                            ref,
+                            const PregnancySectionPage(),
+                          ),
+                        ),
+                        ProfileSectionCard(
+                          tileKey: const Key('profile_section_health'),
+                          icon: Icons.favorite_outline_rounded,
+                          title: '健康',
+                          summary: healthSummary(snap),
+                          sensitive: true,
+                          onTap: () => _openSection(
+                            context,
+                            ref,
+                            const HealthSectionPage(),
+                          ),
+                        ),
+                        ProfileSectionCard(
+                          tileKey: const Key('profile_section_meds'),
+                          icon: Icons.medication_outlined,
+                          title: '用药与过敏',
+                          summary: medicationsSummary(snap),
+                          sensitive: true,
+                          onTap: () => _openSection(
+                            context,
+                            ref,
+                            const MedicationsSectionPage(),
+                          ),
+                        ),
+                        ProfileSectionCard(
+                          tileKey: const Key('profile_section_lifestyle'),
+                          icon: Icons.spa_outlined,
+                          title: '生活方式',
+                          summary: lifestyleSummary(snap),
+                          onTap: () => _openSection(
+                            context,
+                            ref,
+                            const LifestyleSectionPage(),
+                          ),
+                        ),
+                        ProfileSectionCard(
+                          tileKey: const Key('profile_section_prefs'),
+                          icon: Icons.tune_rounded,
+                          title: '偏好',
+                          summary: preferencesSummary(snap),
+                          onTap: () => _openSection(
+                            context,
+                            ref,
+                            const PreferencesSectionPage(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  onTap: () => _showAccountSwitcher(context, ref),
-                ),
-                const Divider(indent: 56),
-                _MeTile(
-                  tileKey: const Key('me_privacy'),
-                  icon: Icons.privacy_tip_outlined,
-                  title: AppCopy.privacyTitle,
-                  onTap: () => showPrivacySheet(context, ref),
-                ),
-                const Divider(indent: 56),
-                _MeTile(
-                  tileKey: const Key('me_export'),
-                  icon: Icons.ios_share_rounded,
-                  title: AppCopy.exportData,
-                  onTap: () => _export(context, ref),
-                ),
-                const Divider(indent: 56),
-                _MeTile(
-                  tileKey: const Key('me_delete'),
-                  icon: Icons.delete_outline_rounded,
-                  title: AppCopy.deleteData,
-                  onTap: () => _delete(context, ref),
-                ),
-                const Divider(indent: 56),
-                _MeTile(
-                  tileKey: const Key('me_clear_chat'),
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: AppCopy.clearChatHistory,
-                  onTap: () => _clearChatHistory(context, ref),
-                ),
-                const Divider(indent: 56),
-                _MeTile(
-                  tileKey: const Key('me_clear_summaries'),
-                  icon: Icons.history_toggle_off_rounded,
-                  title: AppCopy.clearSummaries,
-                  onTap: () => _clearSummaries(context, ref),
-                ),
-              ],
+                  const SizedBox(height: SpacingTokens.lg),
+                  Text(
+                    '账号与隐私',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  GlassContainer(
+                    fill: GlassFill.heavy,
+                    borderRadius: RadiusTokens.borderXl,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: SpacingTokens.sm,
+                    ),
+                    child: Column(
+                      children: [
+                        _MeTile(
+                          tileKey: const Key('me_accounts'),
+                          icon: Icons.switch_account_outlined,
+                          title: accountsAsync.maybeWhen(
+                            data: (list) => '切换账号（${list.length}）',
+                            orElse: () => '切换账号',
+                          ),
+                          onTap: () => _showAccountSwitcher(context, ref),
+                        ),
+                        const Divider(indent: 56),
+                        _MeTile(
+                          tileKey: const Key('me_privacy'),
+                          icon: Icons.privacy_tip_outlined,
+                          title: AppCopy.privacyTitle,
+                          onTap: () => showPrivacySheet(context, ref),
+                        ),
+                        const Divider(indent: 56),
+                        _MeTile(
+                          tileKey: const Key('me_export'),
+                          icon: Icons.ios_share_rounded,
+                          title: AppCopy.exportData,
+                          onTap: () => _export(context, ref),
+                        ),
+                        const Divider(indent: 56),
+                        _MeTile(
+                          tileKey: const Key('me_delete'),
+                          icon: Icons.delete_outline_rounded,
+                          title: AppCopy.deleteData,
+                          onTap: () => _delete(context, ref),
+                        ),
+                        const Divider(indent: 56),
+                        _MeTile(
+                          tileKey: const Key('me_clear_chat'),
+                          icon: Icons.chat_bubble_outline_rounded,
+                          title: AppCopy.clearChatHistory,
+                          onTap: () => _clearChatHistory(context, ref),
+                        ),
+                        const Divider(indent: 56),
+                        _MeTile(
+                          tileKey: const Key('me_clear_summaries'),
+                          icon: Icons.history_toggle_off_rounded,
+                          title: AppCopy.clearSummaries,
+                          onTap: () => _clearSummaries(context, ref),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -481,6 +522,61 @@ class _ProfileHero extends StatelessWidget {
             tooltip: '切换账号',
             onPressed: onSwitchAccount,
             icon: const Icon(Icons.switch_account_outlined),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfilePinnedBar extends StatelessWidget {
+  const _ProfilePinnedBar({
+    required this.snapshot,
+    required this.onSwitchAccount,
+  });
+
+  final UserProfileSnapshot snapshot;
+  final VoidCallback onSwitchAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final age = snapshot.ageYears;
+    final agePart = age == null ? '' : ' · $age岁';
+    return GlassContainer(
+      key: const Key('profile_pinned_bar'),
+      fill: GlassFill.heavy,
+      borderRadius: RadiusTokens.borderLg,
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.md,
+        vertical: SpacingTokens.sm,
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: AppColors.glassRoseSoft,
+            child: Text(
+              _initial(snapshot.displayName),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppColors.primaryDeep,
+                  ),
+            ),
+          ),
+          const SizedBox(width: SpacingTokens.sm),
+          Expanded(
+            child: Text(
+              '我的 · ${snapshot.displayName}$agePart',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          IconButton(
+            key: const Key('profile_switch_account_pinned'),
+            tooltip: '切换账号',
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            onPressed: onSwitchAccount,
+            icon: const Icon(Icons.switch_account_outlined, size: 20),
           ),
         ],
       ),
