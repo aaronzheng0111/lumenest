@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app_copy.dart';
+import '../../chat/chat_timestamp_format.dart';
 import '../../domain/agent_role.dart';
 import '../../providers.dart';
 import '../../theme/app_colors.dart';
@@ -88,6 +89,11 @@ class ConversationListPage extends ConsumerWidget {
                           item.preview ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(
+                          formatConversationTimestamp(item.lastMessageAt),
+                          key: Key('conversation_timestamp_${item.id}'),
+                          style: Theme.of(context).textTheme.labelSmall,
                         ),
                         onTap: () {
                           if (item.isGroup) {

@@ -409,6 +409,7 @@ class _GroupChatSessionPageState extends ConsumerState<GroupChatSessionPage> {
                                 speakerRole: speaker.wireId,
                               ),
                               showActions: false,
+                              showTimestamp: false,
                             );
                           }
                           return ChatAwaitingReply(tools: _pendingTools);

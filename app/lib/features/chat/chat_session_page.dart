@@ -467,6 +467,7 @@ class _ChatSessionPageState extends ConsumerState<ChatSessionPage> {
                                 speakerRole: speaker.wireId,
                               ),
                               showActions: false,
+                              showTimestamp: false,
                             );
                           }
                           return ChatAwaitingReply(tools: _pendingTools);

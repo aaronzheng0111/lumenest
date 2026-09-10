@@ -4,6 +4,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../app_copy.dart';
 import '../../chat/chat_media.dart';
+import '../../chat/chat_timestamp_format.dart';
 import '../../data/conversation_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/glass_tokens.dart';
@@ -18,6 +19,7 @@ class ChatBubble extends StatelessWidget {
     required this.message,
     this.animateReveal = false,
     this.showActions = true,
+    this.showTimestamp = true,
     this.onDeleted,
     this.onCopied,
   });
@@ -29,6 +31,9 @@ class ChatBubble extends StatelessWidget {
 
   /// When false, hide copy/delete (e.g. in-flight stream draft).
   final bool showActions;
+
+  /// When false, hide the time for an in-flight stream draft.
+  final bool showTimestamp;
 
   final VoidCallback? onDeleted;
   final VoidCallback? onCopied;
@@ -177,27 +182,12 @@ class ChatBubble extends StatelessWidget {
                       horizontal: SpacingTokens.md,
                       vertical: SpacingTokens.sm,
                     ),
-                    child: isUser
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (message.media.isNotEmpty)
-                                _MessageMediaRow(media: message.media),
-                              if (message.content.isNotEmpty)
-                                Text(message.content, style: bodyStyle),
-                            ],
-                          )
-                        : animateReveal
-                            ? _TypewriterText(
-                                key: ValueKey('type_${message.id}'),
-                                text: message.content,
-                                style: bodyStyle,
-                              )
-                            : _AssistantMarkdown(
-                                data: message.content,
-                                style: bodyStyle,
-                              ),
+                    child: _ChatBubbleContent(
+                      message: message,
+                      bodyStyle: bodyStyle,
+                      animateReveal: animateReveal,
+                      showTimestamp: showTimestamp,
+                    ),
                   ),
                 ),
               ),
@@ -259,6 +249,68 @@ class ChatBubble extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _ChatBubbleContent extends StatelessWidget {
+  const _ChatBubbleContent({
+    required this.message,
+    required this.bodyStyle,
+    required this.animateReveal,
+    required this.showTimestamp,
+  });
+
+  final ChatMessage message;
+  final TextStyle? bodyStyle;
+  final bool animateReveal;
+  final bool showTimestamp;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = message.isUser
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (message.media.isNotEmpty)
+                _MessageMediaRow(media: message.media),
+              if (message.content.isNotEmpty)
+                Text(message.content, style: bodyStyle),
+            ],
+          )
+        : animateReveal
+            ? _TypewriterText(
+                key: ValueKey('type_${message.id}'),
+                text: message.content,
+                style: bodyStyle,
+              )
+            : _AssistantMarkdown(
+                data: message.content,
+                style: bodyStyle,
+              );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        content,
+        if (showTimestamp) ...[
+          const SizedBox(height: 3),
+          Align(
+            widthFactor: 1,
+            alignment: Alignment.centerRight,
+            child: Text(
+              formatChatBubbleTimestamp(message.createdAt),
+              key: Key('bubble_timestamp_${message.id}'),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontSize: 11,
+                    height: 1.2,
+                  ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
