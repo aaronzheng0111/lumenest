@@ -100,3 +100,12 @@ flutter build apk --flavor dev --debug --dart-define-from-file=env/dev.json
 - 产品与分期：[`sdd/INDEX.md`](sdd/INDEX.md)
 - 任务清单：[`Task.md`](Task.md)
 - 视觉：[`DESIGN.md`](DESIGN.md)
+
+## License
+
+Dual-licensed:
+
+- **AGPL-3.0** for open use — see [`LICENSE`](LICENSE)
+- **Commercial / proprietary** use (without AGPL obligations) **must contact first** — see [`COMMERCIAL.md`](COMMERCIAL.md)
+
+Contact: `aaronzheng0111@gmail.com`
